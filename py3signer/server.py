@@ -6,6 +6,7 @@ import ssl
 
 from aiohttp import web
 
+from .bulk_loader import load_keystores_from_directory
 from .config import Config
 from .handlers import APIHandler, setup_routes
 from .metrics_middleware import setup_metrics_middleware
@@ -26,6 +27,13 @@ def create_app(config: Config) -> web.Application:
     storage = KeyStorage()
     signer = Signer(storage)
     handler = APIHandler(storage, signer, auth_token=config.auth_token)
+
+    # Load keystores from directory if configured
+    if config.key_store_path:
+        success, failures = load_keystores_from_directory(config.key_store_path, storage)
+        logger.info(f"Loaded {success} keystores from {config.key_store_path}")
+        if failures > 0:
+            logger.warning(f"Failed to load {failures} keystores")
 
     # Create app
     app = web.Application()

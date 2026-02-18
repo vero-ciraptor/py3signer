@@ -28,6 +28,9 @@ class Config(msgspec.Struct, frozen=True):
     metrics_host: str = "127.0.0.1"
     metrics_port: int = 8081
 
+    # Keystore settings
+    key_store_path: Path | None = None
+
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
         # msgspec handles basic type validation, but we need custom validation
@@ -53,6 +56,13 @@ class Config(msgspec.Struct, frozen=True):
         # Validate metrics port
         if self.metrics_port < 1 or self.metrics_port > 65535:
             raise ValueError(f"metrics_port must be between 1 and 65535, got {self.metrics_port}")
+
+        # Validate key_store_path if provided
+        if self.key_store_path is not None:
+            if not self.key_store_path.exists():
+                raise ValueError(f"key_store_path does not exist: {self.key_store_path}")
+            if not self.key_store_path.is_dir():
+                raise ValueError(f"key_store_path must be a directory: {self.key_store_path}")
 
     @property
     def normalized_log_level(self) -> str:
@@ -92,6 +102,12 @@ def get_config() -> Config:
     parser.add_argument(
         "--metrics-host", default="127.0.0.1", help="Host for metrics server (default: 127.0.0.1)"
     )
+    parser.add_argument(
+        "--key-store-path",
+        type=Path,
+        default=None,
+        help="Path to directory containing keystores (matching .json files with .txt password files)",
+    )
 
     args = parser.parse_args()
 
@@ -106,6 +122,7 @@ def get_config() -> Config:
         "metrics_enabled": args.metrics_enabled,
         "metrics_port": args.metrics_port,
         "metrics_host": args.metrics_host,
+        "key_store_path": args.key_store_path,
     }
 
     # Create config from dict using msgspec convert
