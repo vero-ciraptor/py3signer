@@ -17,14 +17,20 @@ async def test_health_endpoint(client):
     assert data["keys_loaded"] == 0
 
 
+@pytest.mark.parametrize("endpoint,extract_key", [
+    ("/eth/v1/keystores", "data"),
+    ("/api/v1/eth2/publicKeys", None),
+])
 @pytest.mark.asyncio
-async def test_list_empty_keystores(client):
-    """Test listing keystores when none are loaded."""
-    resp = await client.get("/eth/v1/keystores")
+async def test_list_empty(client, endpoint, extract_key):
+    """Test listing endpoints when none are loaded."""
+    resp = await client.get(endpoint)
     assert resp.status == 200
     
     data = await resp.json()
-    assert data["data"] == []
+    if extract_key:
+        data = data.get(extract_key)
+    assert data == []
 
 
 @pytest.mark.asyncio
@@ -38,33 +44,21 @@ async def test_import_keystore_invalid_json(client):
     assert resp.status == 400
 
 
+@pytest.mark.parametrize("keystores,passwords,expected_error", [
+    (["keystore1"], ["pass1", "pass2"], "keystores and passwords must have the same length"),
+    ([], [], "keystores must not be empty"),
+])
 @pytest.mark.asyncio
-async def test_import_keystore_mismatched_arrays(client):
-    """Test importing with mismatched keystores/passwords."""
+async def test_import_keystore_validation_errors(client, keystores, passwords, expected_error):
+    """Test importing with various validation errors."""
     resp = await client.post(
         "/eth/v1/keystores",
-        json={
-            "keystores": ["keystore1"],
-            "passwords": ["pass1", "pass2"]
-        }
+        json={"keystores": keystores, "passwords": passwords}
     )
     assert resp.status == 400
     
     data = await resp.json()
     assert "error" in data
-
-
-@pytest.mark.asyncio
-async def test_import_keystore_empty_arrays(client):
-    """Test importing with empty arrays."""
-    resp = await client.post(
-        "/eth/v1/keystores",
-        json={
-            "keystores": [],
-            "passwords": []
-        }
-    )
-    assert resp.status == 400
 
 
 @pytest.mark.asyncio
@@ -196,16 +190,6 @@ async def test_remote_keys_stub(client):
 
 
 @pytest.mark.asyncio
-async def test_list_public_keys_empty(client):
-    """Test listing public keys when none are loaded."""
-    resp = await client.get("/api/v1/eth2/publicKeys")
-    assert resp.status == 200
-
-    data = await resp.json()
-    assert data == []
-
-
-@pytest.mark.asyncio
 async def test_list_public_keys_after_import(client, sample_keystore, sample_keystore_password):
     """Test listing public keys after importing keystores."""
     # First import a keystore
@@ -231,9 +215,13 @@ async def test_list_public_keys_after_import(client, sample_keystore, sample_key
     assert data[0] == expected_pubkey
 
 
+@pytest.mark.parametrize("endpoint", [
+    "/eth/v1/keystores",
+    "/api/v1/eth2/publicKeys",
+])
 @pytest.mark.asyncio
-async def test_list_public_keys_auth_required(client, sample_keystore, sample_keystore_password):
-    """Test that publicKeys endpoint requires auth when configured."""
+async def test_auth_token_required(endpoint):
+    """Test that auth token is required when configured."""
     from py3signer.config import Config
     from py3signer.server import create_app
     from aiohttp.test_utils import TestClient, TestServer
@@ -251,17 +239,22 @@ async def test_list_public_keys_auth_required(client, sample_keystore, sample_ke
 
     try:
         # Request without auth should fail
-        resp = await client.get("/api/v1/eth2/publicKeys")
+        resp = await client.get(endpoint)
+        assert resp.status == 401
+
+        # Request with wrong auth should fail
+        resp = await client.get(
+            endpoint,
+            headers={"Authorization": "Bearer wrong_token"}
+        )
         assert resp.status == 401
 
         # Request with correct auth should succeed
         resp = await client.get(
-            "/api/v1/eth2/publicKeys",
+            endpoint,
             headers={"Authorization": "Bearer secret_token"}
         )
         assert resp.status == 200
-        data = await resp.json()
-        assert data == []
     finally:
         await client.close()
 
@@ -273,15 +266,21 @@ async def test_sign_missing_identifier(client):
     assert resp.status in [404, 405]  # Route not found or method not allowed
 
 
+@pytest.mark.parametrize("request_body,expected_status", [
+    ({}, 400),  # missing signingRoot
+    ({"signingRoot": "not_hex", "domain_name": "beacon_attester"}, 400),  # invalid hex
+    ({"signingRoot": "abcd1234", "domain_name": "beacon_attester"}, 400),  # wrong length
+    ({"signingRoot": "abcd1234" * 8}, 400),  # no domain or domain_name
+])
 @pytest.mark.asyncio
-async def test_sign_missing_signing_root(client):
-    """Test signing without signingRoot."""
+async def test_sign_validation_errors(client, request_body, expected_status):
+    """Test signing with various validation errors."""
     pubkey = "a" * 96
     resp = await client.post(
         f"/api/v1/eth2/sign/{pubkey}",
-        json={}
+        json=request_body
     )
-    assert resp.status == 400
+    assert resp.status == expected_status
     
     data = await resp.json()
     assert "error" in data
@@ -299,48 +298,6 @@ async def test_sign_key_not_found(client):
         }
     )
     assert resp.status == 404
-
-
-@pytest.mark.asyncio
-async def test_sign_invalid_hex(client):
-    """Test signing with invalid hex."""
-    pubkey = "a" * 96
-    resp = await client.post(
-        f"/api/v1/eth2/sign/{pubkey}",
-        json={"signingRoot": "not_hex", "domain_name": "beacon_attester"}
-    )
-    assert resp.status == 400
-    
-    data = await resp.json()
-    assert "error" in data
-
-
-@pytest.mark.asyncio
-async def test_sign_wrong_signing_root_length(client):
-    """Test signing with wrong signing root length."""
-    pubkey = "a" * 96
-    resp = await client.post(
-        f"/api/v1/eth2/sign/{pubkey}",
-        json={
-            "signingRoot": "abcd1234",  # Too short
-            "domain_name": "beacon_attester"
-        }
-    )
-    assert resp.status == 400
-
-
-@pytest.mark.asyncio
-async def test_sign_no_domain_or_name(client):
-    """Test signing without domain or domain_name."""
-    pubkey = "a" * 96
-    resp = await client.post(
-        f"/api/v1/eth2/sign/{pubkey}",
-        json={
-            "signingRoot": "abcd1234" * 8
-            # No domain or domain_name
-        }
-    )
-    assert resp.status == 400
 
 
 @pytest.mark.asyncio
@@ -395,43 +352,3 @@ async def test_full_flow(client, sample_keystore, sample_keystore_password):
     assert resp.status == 200
     data = await resp.json()
     assert len(data["data"]) == 0
-
-
-@pytest.mark.asyncio
-async def test_auth_token_required():
-    """Test that auth token is required when configured."""
-    from py3signer.config import Config
-    from py3signer.server import create_app
-    from aiohttp.test_utils import TestClient, TestServer
-    
-    config = Config(
-        host="127.0.0.1",
-        port=8080,
-        auth_token="secret_token"
-    )
-    
-    app = create_app(config)
-    server = TestServer(app)
-    client = TestClient(server)
-    await client.start_server()
-    
-    try:
-        # Request without auth should fail
-        resp = await client.get("/eth/v1/keystores")
-        assert resp.status == 401
-        
-        # Request with wrong auth should fail
-        resp = await client.get(
-            "/eth/v1/keystores",
-            headers={"Authorization": "Bearer wrong_token"}
-        )
-        assert resp.status == 401
-        
-        # Request with correct auth should succeed
-        resp = await client.get(
-            "/eth/v1/keystores",
-            headers={"Authorization": "Bearer secret_token"}
-        )
-        assert resp.status == 200
-    finally:
-        await client.close()
