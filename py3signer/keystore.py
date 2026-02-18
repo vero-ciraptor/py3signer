@@ -88,7 +88,3 @@ class Keystore(msgspec.Struct):
             if "checksum" in error_msg or "password" in error_msg or "invalid" in error_msg:
                 raise KeystoreError("Invalid password")
             raise KeystoreError(f"Decryption failed: {e}")
-
-
-# Alias for backward compatibility
-EIP2335Keystore = Keystore
