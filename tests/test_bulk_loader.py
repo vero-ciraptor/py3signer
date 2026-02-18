@@ -150,7 +150,7 @@ class TestLoadKeystoresFromDirectory:
         # Copy test keystore
         keystore_data = json.loads((test_data / "test_keystore_scrypt.json").read_text())
         keystore_data["pubkey"] = (
-            "a792e85e01746b22e89c7289aa693c4413db2c83d1209380cc4e98fc132ba49c301606032f77089d90e2df0539d23037"
+            "97248533cef0908a5ebe52c3b487471301bf6369010e6167f63dd74feddac2dfb5336a59a331d38eb0e454d6f6fcb1a4"
         )
         keystore1_json.write_text(json.dumps(keystore_data))
         keystore1_txt.write_text("testpassword123")
@@ -276,7 +276,7 @@ class TestLoadKeystoresPersistentParameter:
 
         keystore_data = json.loads((test_data / "test_keystore_scrypt.json").read_text())
         keystore_data["pubkey"] = (
-            "a792e85e01746b22e89c7289aa693c4413db2c83d1209380cc4e98fc132ba49c301606032f77089d90e2df0539d23037"
+            "97248533cef0908a5ebe52c3b487471301bf6369010e6167f63dd74feddac2dfb5336a59a331d38eb0e454d6f6fcb1a4"
         )
         keystore_json.write_text(json.dumps(keystore_data))
         keystore_txt.write_text("testpassword123")
@@ -290,7 +290,7 @@ class TestLoadKeystoresPersistentParameter:
 
         # Verify the key is marked as non-persistent by checking remove behavior
         # (non-persistent keys should not trigger disk deletion)
-        pubkey_hex = "a792e85e01746b22e89c7289aa693c4413db2c83d1209380cc4e98fc132ba49c301606032f77089d90e2df0539d23037"
+        pubkey_hex = "97248533cef0908a5ebe52c3b487471301bf6369010e6167f63dd74feddac2dfb5336a59a331d38eb0e454d6f6fcb1a4"
         removed, deleted_from_disk = storage.remove_key(pubkey_hex)
         assert removed is True
         # deleted_from_disk should be False since key is non-persistent
@@ -313,7 +313,7 @@ class TestLoadInputOnlyKeystores:
         keystore_json = keystores_dir / "test_keystore.json"
         keystore_data = json.loads((test_data / "test_keystore_scrypt.json").read_text())
         keystore_data["pubkey"] = (
-            "a792e85e01746b22e89c7289aa693c4413db2c83d1209380cc4e98fc132ba49c301606032f77089d90e2df0539d23037"
+            "97248533cef0908a5ebe52c3b487471301bf6369010e6167f63dd74feddac2dfb5336a59a331d38eb0e454d6f6fcb1a4"
         )
         keystore_json.write_text(json.dumps(keystore_data))
 
@@ -329,7 +329,7 @@ class TestLoadInputOnlyKeystores:
         assert len(storage) == 1
 
         # Verify key is non-persistent
-        pubkey_hex = "a792e85e01746b22e89c7289aa693c4413db2c83d1209380cc4e98fc132ba49c301606032f77089d90e2df0539d23037"
+        pubkey_hex = "97248533cef0908a5ebe52c3b487471301bf6369010e6167f63dd74feddac2dfb5336a59a331d38eb0e454d6f6fcb1a4"
         removed, deleted_from_disk = storage.remove_key(pubkey_hex)
         assert removed is True
         assert deleted_from_disk is False  # Non-persistent

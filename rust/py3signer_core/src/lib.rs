@@ -218,7 +218,7 @@ mod keystore {
     use super::{PyResult, PyRuntimeError, PyValueError};
     use aes::cipher::{KeyIvInit, StreamCipher};
     use serde::{Deserialize, Serialize};
-    use sha3::{Digest as Sha3Digest, Keccak256};
+    use sha2::{Digest, Sha256};
 
     type Aes256Ctr = ctr::Ctr128BE<aes::Aes256>;
 
@@ -322,27 +322,21 @@ mod keystore {
             }
         }
 
-        // Verify checksum (version-dependent)
+        // Verify checksum - only version 4 (EIP-2335) is supported
+        if keystore.version != 4 {
+            return Err(PyValueError::new_err(
+                format!("Keystore version {} is not supported, only version 4 (EIP-2335) is supported", keystore.version)
+            ));
+        }
+
         let expected_checksum = hex::decode(&keystore.crypto.checksum.message)
             .map_err(|e| PyValueError::new_err(format!("Invalid checksum hex: {e}")))?;
 
-        let checksum_valid = match keystore.version {
-            4 => {
-                // Version 4 uses SHA-256 for checksum
-                use sha2::{Digest, Sha256};
-                let mut hasher = Sha256::new();
-                hasher.update(&key[16..32]);
-                hasher.update(&ciphertext);
-                hasher.finalize().as_slice() == expected_checksum.as_slice()
-            }
-            _ => {
-                // Version 3 uses Keccak-256 for checksum
-                let mut hasher = Keccak256::new();
-                hasher.update(&key[16..32]);
-                hasher.update(&ciphertext);
-                hasher.finalize().as_slice() == expected_checksum.as_slice()
-            }
-        };
+        // Version 4 uses SHA-256 for checksum
+        let mut hasher = Sha256::new();
+        hasher.update(&key[16..32]);
+        hasher.update(&ciphertext);
+        let checksum_valid = hasher.finalize().as_slice() == expected_checksum.as_slice();
 
         if !checksum_valid {
             return Err(PyValueError::new_err(

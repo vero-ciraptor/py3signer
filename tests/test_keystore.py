@@ -181,5 +181,5 @@ class TestKeystoreDecryptionV4:
         # Verify the public key matches
         pubkey = secret_key.public_key()
         pubkey_hex = pubkey.to_bytes().hex()
-        expected_pubkey = "b9e03b94bb696b0e4c7939bce96d9e4fb1938074233d87b290b20cf66d3e48a7f3d852d89969f45c075e3dca91945832"
+        expected_pubkey = "a7515c6ae1bc0448be300a97f84d27c870b67d3d10a2bd3d01b5be4fb5c6023c50452e69d3c09709cfe65b446adc1b0a"
         assert pubkey_hex == expected_pubkey

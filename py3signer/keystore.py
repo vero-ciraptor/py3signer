@@ -37,7 +37,10 @@ class Keystore(msgspec.Struct):
         # crypto, pubkey, path, uuid, version are already validated by msgspec
         # as they are required fields with types
         if self.version != 4:
-            logger.warning(f"Unexpected keystore version: {self.version}")
+            raise KeystoreError(
+                f"Keystore version {self.version} is not supported, "
+                "only version 4 (EIP-2335) is supported"
+            )
 
         if "kdf" not in self.crypto or "checksum" not in self.crypto or "cipher" not in self.crypto:
             raise KeystoreError("Invalid crypto structure")
