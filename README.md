@@ -317,6 +317,59 @@ uv run python -m py3signer --log-level DEBUG
 ./examples/test_api.sh
 ```
 
+## Benchmarking
+
+A benchmark script is included to measure signature throughput on the `/api/v1/eth2/sign/{identifier}` endpoint.
+
+### Running the Benchmark
+
+```bash
+# Basic benchmark with defaults (1000 requests, 10 concurrent)
+uv run python scripts/benchmark.py
+
+# Custom URL and concurrency
+uv run python scripts/benchmark.py --url http://localhost:9000 --concurrency 20
+
+# With authentication
+uv run python scripts/benchmark.py --auth-token mysecrettoken
+
+# Custom request count
+uv run python scripts/benchmark.py --requests 5000 --concurrency 50
+
+# Auto-import keystores from path
+uv run python scripts/benchmark.py --key-store-path ./keystores
+```
+
+### Benchmark Output
+
+```
+py3signer Benchmark
+===================
+URL: http://localhost:8080
+Concurrency: 10
+Total Requests: 1000
+
+Results:
+  Total Time: 5.23s
+  Signatures/sec: 191.2
+  Avg Latency: 52.1ms
+  P50: 48ms
+  P95: 78ms
+  P99: 102ms
+  Errors: 0 (0.0%)
+```
+
+### Benchmark Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--url` | Server URL | `http://localhost:8080` |
+| `--concurrency` | Number of concurrent requests | `10` |
+| `--requests` | Total number of requests | `1000` |
+| `--key-store-path` | Path to keystores for auto-loading | None |
+| `--auth-token` | Bearer token for authentication | None |
+| `--pubkey` | Specific public key to use for signing | None (auto-detect) |
+
 ## Project Structure
 
 ```
