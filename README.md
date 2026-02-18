@@ -52,6 +52,9 @@ cd py3signer
 # Or manually:
 uv sync
 uv run maturin develop
+
+# Install pre-commit hooks (optional but recommended)
+pre-commit install
 ```
 
 ### Production Installation
@@ -377,9 +380,7 @@ uv run python -m py3signer
 uv run pytest
 
 # Linting and formatting
-uv run ruff check py3signer tests
-uv run ruff format py3signer tests
-uv run mypy py3signer
+uv run pre-commit run --all-files
 
 # Lock dependencies
 uv lock
