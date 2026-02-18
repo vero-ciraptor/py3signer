@@ -64,7 +64,7 @@ COPY --from=builder /build/dist/*.whl /tmp/
 
 # Create virtual environment, install dependencies, clean up, and create cache directory
 RUN uv venv && \
-    uv pip install "/tmp/*.whl" "aiohttp>=3.11.0" "msgspec>=0.19.0" && \
+    uv pip install /tmp/*.whl "aiohttp>=3.11.0" "msgspec>=0.19.0" && \
     rm /tmp/*.whl && \
     mkdir -p /app/.cache/uv && chown -R py3signer:py3signer /app/.cache
 
