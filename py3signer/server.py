@@ -11,6 +11,8 @@ from .config import Config
 from .storage import KeyStorage
 from .signer import Signer
 from .handlers import APIHandler, setup_routes
+from .metrics_middleware import setup_metrics_middleware
+from .metrics_server import MetricsServer
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,9 @@ def create_app(config: Config) -> web.Application:
     
     # Setup routes
     setup_routes(app, handler)
+    
+    # Setup metrics middleware (after routes are registered)
+    setup_metrics_middleware(app)
     
     return app
 
@@ -64,6 +69,13 @@ async def run_server(config: Config) -> None:
     
     protocol = "https" if ssl_context else "http"
     logger.info(f"Server running at {protocol}://{config.host}:{config.port}")
+    
+    # Start metrics server if enabled
+    metrics_server: MetricsServer | None = None
+    if config.metrics_enabled:
+        metrics_server = MetricsServer(host=config.metrics_host, port=config.metrics_port)
+        await metrics_server.start()
+    
     logger.info("Press Ctrl+C to stop")
     
     # Keep running
@@ -73,4 +85,6 @@ async def run_server(config: Config) -> None:
     except asyncio.CancelledError:
         pass
     finally:
+        if metrics_server:
+            await metrics_server.stop()
         await runner.cleanup()

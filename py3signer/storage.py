@@ -6,6 +6,8 @@ from typing import Dict, List, Tuple
 
 from py3signer_core import SecretKey, PublicKey
 
+from .metrics import KEYS_LOADED
+
 logger = logging.getLogger(__name__)
 
 
@@ -46,6 +48,9 @@ class KeyStorage:
             description=description
         )
         
+        # Update metrics
+        KEYS_LOADED.set(len(self._keys))
+        
         self._logger.info(f"Added key: {pubkey_hex[:20]}...")
         return pubkey_hex
     
@@ -64,6 +69,8 @@ class KeyStorage:
         """Remove a key from storage. Returns True if key was found and removed."""
         if pubkey_hex in self._keys:
             del self._keys[pubkey_hex]
+            # Update metrics
+            KEYS_LOADED.set(len(self._keys))
             self._logger.info(f"Removed key: {pubkey_hex[:20]}...")
             return True
         return False
@@ -79,3 +86,4 @@ class KeyStorage:
     def clear(self) -> None:
         """Clear all keys (useful for testing)."""
         self._keys.clear()
+        KEYS_LOADED.set(0)

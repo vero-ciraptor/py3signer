@@ -26,6 +26,11 @@ class Config(msgspec.Struct, frozen=True):
     # Security
     auth_token: str | None = None
     
+    # Metrics settings
+    metrics_enabled: bool = False
+    metrics_host: str = "127.0.0.1"
+    metrics_port: int = 8081
+    
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
         # msgspec handles basic type validation, but we need custom validation
@@ -47,6 +52,10 @@ class Config(msgspec.Struct, frozen=True):
         
         if self.tls_key is not None and not self.tls_key.exists():
             raise ValueError(f"tls_key file not found: {self.tls_key}")
+        
+        # Validate metrics port
+        if self.metrics_port < 1 or self.metrics_port > 65535:
+            raise ValueError(f"metrics_port must be between 1 and 65535, got {self.metrics_port}")
     
     @property
     def normalized_log_level(self) -> str:
@@ -93,6 +102,19 @@ def load_from_env() -> dict:
     if "PY3SIGNER_AUTH_TOKEN" in os.environ:
         env_vars["auth_token"] = os.environ["PY3SIGNER_AUTH_TOKEN"]
     
+    # Metrics environment variables
+    if "PY3SIGNER_METRICS_ENABLED" in os.environ:
+        env_vars["metrics_enabled"] = os.environ["PY3SIGNER_METRICS_ENABLED"].lower() in ("true", "1", "yes")
+    
+    if "PY3SIGNER_METRICS_HOST" in os.environ:
+        env_vars["metrics_host"] = os.environ["PY3SIGNER_METRICS_HOST"]
+    
+    if "PY3SIGNER_METRICS_PORT" in os.environ:
+        try:
+            env_vars["metrics_port"] = int(os.environ["PY3SIGNER_METRICS_PORT"])
+        except ValueError:
+            raise ValueError("PY3SIGNER_METRICS_PORT must be an integer")
+    
     return env_vars
 
 
@@ -136,6 +158,20 @@ def get_config() -> Config:
         "--auth-token",
         help="Bearer token for API authentication"
     )
+    parser.add_argument(
+        "--metrics-enabled",
+        action="store_true",
+        help="Enable Prometheus metrics endpoint (default: false)"
+    )
+    parser.add_argument(
+        "--metrics-port",
+        type=int,
+        help="Port for metrics server (default: 8081)"
+    )
+    parser.add_argument(
+        "--metrics-host",
+        help="Host for metrics server (default: 127.0.0.1)"
+    )
     
     args = parser.parse_args()
     
@@ -164,6 +200,12 @@ def get_config() -> Config:
         config_dict["log_level"] = args.log_level
     if args.auth_token:
         config_dict["auth_token"] = args.auth_token
+    if args.metrics_enabled:
+        config_dict["metrics_enabled"] = True
+    if args.metrics_port:
+        config_dict["metrics_port"] = args.metrics_port
+    if args.metrics_host:
+        config_dict["metrics_host"] = args.metrics_host
     
     # Create config from dict using msgspec convert
     try:
