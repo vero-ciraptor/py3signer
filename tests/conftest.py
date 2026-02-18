@@ -38,41 +38,21 @@ async def client(config: Config):
     await client.close()
 
 
+import json
+from pathlib import Path
+
 @pytest.fixture
 def sample_keystore() -> dict:
-    """Return a sample EIP-2335 keystore for testing."""
-    return {
-        "crypto": {
-            "kdf": {
-                "function": "scrypt",
-                "params": {
-                    "dklen": 32,
-                    "n": 262144,
-                    "p": 1,
-                    "r": 8,
-                    "salt": "d4e56740f876aef8c010b86a40d5f56745a118d0906a34e69aec8c0db1cb8fa3"
-                },
-                "message": ""
-            },
-            "checksum": {
-                "function": "sha256",
-                "params": {},
-                "message": "d2217fe5f3e9a1e34581ef8a78f7c9928e436d36dacc5e8462a8d5b1663e21e0"
-            },
-            "cipher": {
-                "function": "aes-128-ctr",
-                "params": {
-                    "iv": "264daa3f5d6237fe8e0bd504c252495c"
-                },
-                "message": "06ae90d9fe2f6c66c34d5e5afb0e71f2"
-            }
-        },
-        "description": "Test keystore",
-        "pubkey": "a99a76ed7796f7be22d5b7e85deeb7c5677e88e511e0b337618f8c4eb61349b4bf2d153f649f7b53359fe8b94a38e44c",
-        "path": "m/12381/3600/0/0/0",
-        "uuid": "f1b49410-fd1d-41fd-a222-340f74867fa9",
-        "version": 4
-    }
+    """Return a sample EIP-2335 keystore for testing.
+    
+    This is a real, valid keystore that can be decrypted with
+    the password from sample_keystore_password fixture.
+    Uses scrypt KDF with N=262144.
+    """
+    # Load the pre-generated scrypt keystore from test data
+    keystore_path = Path(__file__).parent / "data" / "test_keystore_scrypt.json"
+    with open(keystore_path) as f:
+        return json.load(f)
 
 
 @pytest.fixture

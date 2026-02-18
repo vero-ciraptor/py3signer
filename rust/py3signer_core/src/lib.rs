@@ -285,8 +285,9 @@ mod keystore {
         let mut key = vec![0u8; 32];
         match &keystore.crypto.kdf.params {
             KdfParams::Scrypt { n, r, p, dklen, .. } => {
+                let log_n = (*n as f64).log2() as u8;
                 let params = scrypt::Params::new(
-                    (*n as u8).trailing_zeros() as u8,
+                    log_n,
                     *r,
                     *p,
                     *dklen as usize,

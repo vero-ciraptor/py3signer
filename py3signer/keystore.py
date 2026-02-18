@@ -83,6 +83,10 @@ class Keystore:
             json_str = json.dumps(self.data)
             secret_bytes = decrypt_keystore(json_str, password)
             
+            # Convert list to bytes if necessary (Rust returns Vec<u8> as list)
+            if isinstance(secret_bytes, list):
+                secret_bytes = bytes(secret_bytes)
+            
             if len(secret_bytes) != 32:
                 raise KeystoreError(f"Invalid secret key length: {len(secret_bytes)}")
             
