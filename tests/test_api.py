@@ -473,10 +473,10 @@ async def test_sign_attestation(
     )
     assert resp.status == 200
 
-    data = await resp.json()
-    assert "signature" in data
-    assert data["signature"].startswith("0x")
-    assert len(data["signature"]) == 194  # 0x + 96 bytes * 2 = 194
+    data = await resp.text()
+    # Response is now a plain hex string per Web3Signer API spec
+    assert data.startswith("0x")
+    assert len(data) == 194  # 0x + 96 bytes * 2 = 194
 
 
 @pytest.mark.asyncio
@@ -508,8 +508,10 @@ async def test_sign_randao(
     )
     assert resp.status == 200
 
-    data = await resp.json()
-    assert "signature" in data
+    data = await resp.text()
+    # Response is now a plain hex string per Web3Signer API spec
+    assert data.startswith("0x")
+    assert len(data) == 194  # 0x + 96 bytes * 2 = 194
 
 
 @pytest.mark.asyncio
@@ -541,8 +543,10 @@ async def test_sign_voluntary_exit(
     )
     assert resp.status == 200
 
-    data = await resp.json()
-    assert "signature" in data
+    data = await resp.text()
+    # Response is now a plain hex string per Web3Signer API spec
+    assert data.startswith("0x")
+    assert len(data) == 194  # 0x + 96 bytes * 2 = 194
 
 
 @pytest.mark.asyncio
@@ -583,8 +587,10 @@ async def test_sign_block_v2(
     )
     assert resp.status == 200
 
-    data = await resp.json()
-    assert "signature" in data
+    data = await resp.text()
+    # Response is now a plain hex string per Web3Signer API spec
+    assert data.startswith("0x")
+    assert len(data) == 194  # 0x + 96 bytes * 2 = 194
 
 
 @pytest.mark.asyncio
@@ -629,10 +635,10 @@ async def test_full_flow(
         },
     )
     assert resp.status == 200
-    data = await resp.json()
-    assert "signature" in data
-    assert data["signature"].startswith("0x")
-    assert len(data["signature"]) == 194  # 0x + 96 bytes * 2 = 194
+    data = await resp.text()
+    # Response is now a plain hex string per Web3Signer API spec
+    assert data.startswith("0x")
+    assert len(data) == 194  # 0x + 96 bytes * 2 = 194
 
     # 4. Delete
     resp = await client.delete("/eth/v1/keystores", json={"pubkeys": [pubkey]})

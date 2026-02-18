@@ -87,6 +87,13 @@ class APIHandler:
         """Health check endpoint."""
         return web.json_response({"status": "healthy", "keys_loaded": len(self._storage)})
 
+    async def healthcheck(self, request: web.Request) -> web.Response:
+        """Health check endpoint for compatibility with Vero validator client.
+
+        Returns Web3Signer-compatible healthcheck response.
+        """
+        return web.json_response({"status": "UP", "outcome": "UP"})
+
     async def list_keystores(self, request: web.Request) -> web.Response:
         """GET /eth/v1/keystores - List all imported keys."""
         await self._require_auth(request)
@@ -259,7 +266,9 @@ class APIHandler:
         try:
             signature = self._signer.sign_data(pubkey_hex=pubkey_hex, data=message, domain=domain)
             signature_hex = signature.to_bytes().hex()
-            return web.json_response({"signature": f"0x{signature_hex}"})
+            # Return just the raw hex string (not JSON) per Web3Signer API spec
+            # The response body should be the signature as a hex string without quotes
+            return web.Response(text=f"0x{signature_hex}", content_type="text/plain")
         except SignerError as e:
             raise web.HTTPNotFound(
                 text=json.dumps({"error": str(e)}), content_type="application/json"
@@ -274,6 +283,7 @@ class APIHandler:
 def setup_routes(app: web.Application, handler: APIHandler) -> None:
     """Set up all routes for the application."""
     app.router.add_get("/health", handler.health)
+    app.router.add_get("/healthcheck", handler.healthcheck)
     app.router.add_get("/eth/v1/keystores", handler.list_keystores)
     app.router.add_post("/eth/v1/keystores", handler.import_keystores)
     app.router.add_delete("/eth/v1/keystores", handler.delete_keystores)

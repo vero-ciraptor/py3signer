@@ -88,6 +88,13 @@ class ProfilingAPIHandler:
         """Health check endpoint."""
         return web.json_response({"status": "healthy", "keys_loaded": len(self._storage)})
 
+    async def healthcheck(self, request: web.Request) -> web.Response:
+        """Health check endpoint for compatibility with Vero validator client.
+
+        Returns Web3Signer-compatible healthcheck response.
+        """
+        return web.json_response({"status": "UP", "outcome": "UP"})
+
     async def list_keystores(self, request: web.Request) -> web.Response:
         """GET /eth/v1/keystores - List all imported keys."""
         await self._require_auth(request)
@@ -299,18 +306,23 @@ class ProfilingAPIHandler:
 
         # Phase 7: Response encoding
         phase_start = time.perf_counter()
-        response_data = {"signature": f"0x{signature_hex}", "_profile": profile_times}
+        # Return just the raw hex string (not JSON) per Web3Signer API spec
+        response_body = f"0x{signature_hex}"
         profile_times["response_encoding"] = (time.perf_counter() - phase_start) * 1_000_000
 
         # Update total time
         profile_times["total"] = (time.perf_counter() - total_start) * 1_000_000
 
-        return web.json_response(response_data)
+        # Log profiling data since we can't include it in the response per API spec
+        logger.info(f"Sign profile: {profile_times}")
+
+        return web.Response(text=response_body, content_type="text/plain")
 
 
 def setup_routes(app: web.Application, handler: ProfilingAPIHandler) -> None:
     """Set up all routes for the application."""
     app.router.add_get("/health", handler.health)
+    app.router.add_get("/healthcheck", handler.healthcheck)
     app.router.add_get("/eth/v1/keystores", handler.list_keystores)
     app.router.add_post("/eth/v1/keystores", handler.import_keystores)
     app.router.add_delete("/eth/v1/keystores", handler.delete_keystores)
