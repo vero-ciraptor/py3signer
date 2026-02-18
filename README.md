@@ -73,8 +73,8 @@ docker build -t py3signer:latest .
 # Run
 docker run -p 8080:8080 py3signer:latest
 
-# With config and keystores
-docker run -v $(pwd)/config.yaml:/app/config.yaml -p 8080:8080 py3signer:latest -c config.yaml
+# With custom arguments
+docker run -p 8080:8080 py3signer:latest --host 0.0.0.0 --port 8080
 ```
 
 ## Usage
@@ -111,34 +111,21 @@ make run-debug
 make test
 ```
 
-### Configuration File
+### TLS Configuration
 
-Create `config.yaml`:
+For HTTPS support:
 
-```yaml
-host: 0.0.0.0
-port: 8080
-log_level: INFO
-auth_token: ${PY3SIGNER_AUTH_TOKEN}  # From environment variable
-tls_cert: /path/to/cert.pem
-tls_key: /path/to/key.pem
-```
-
-Run with config:
 ```bash
-uv run python -m py3signer -c config.yaml
+uv run python -m py3signer --tls-cert cert.pem --tls-key key.pem
 ```
 
-### Environment Variables
+### Authentication
 
-All configuration options can be set via environment variables:
+For API authentication:
 
-- `PY3SIGNER_HOST` - Server host (default: 127.0.0.1)
-- `PY3SIGNER_PORT` - Server port (default: 8080)
-- `PY3SIGNER_LOG_LEVEL` - Logging level (default: INFO)
-- `PY3SIGNER_TLS_CERT` - Path to TLS certificate
-- `PY3SIGNER_TLS_KEY` - Path to TLS key
-- `PY3SIGNER_AUTH_TOKEN` - Bearer token for authentication
+```bash
+uv run python -m py3signer --auth-token mysecrettoken
+```
 
 ## API Reference
 
@@ -358,7 +345,7 @@ py3signer/
 
 - **HTTP Server**: aiohttp
 - **Validation**: msgspec (fast, efficient struct-based validation)
-- **Configuration**: YAML + environment variables with msgspec Struct
+- **Configuration**: CLI arguments with msgspec Struct
 - **BLS Crypto**: blst (Rust via PyO3)
 - **Package Management**: uv
 - **Build**: maturin
