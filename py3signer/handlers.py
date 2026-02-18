@@ -40,20 +40,21 @@ class KeystoreDeleteRequest(msgspec.Struct):
 
 class SignRequest(msgspec.Struct):
     """Request struct for signing data."""
-    signing_root: str = msgspec.field(name="signingRoot")
+    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
     domain: str | None = None
     domain_name: str | None = msgspec.field(name="domainName", default=None)
-    
+
     def __post_init__(self) -> None:
         """Validate signing request."""
-        # Validate signing_root (must be 32 bytes = 64 hex chars)
-        signing_root_clean = self.signing_root.replace("0x", "")
-        if len(signing_root_clean) != 64:
-            raise ValueError("signingRoot must be 32 bytes (64 hex characters)")
-        try:
-            bytes.fromhex(signing_root_clean)
-        except ValueError:
-            raise ValueError("signingRoot must be valid hexadecimal")
+        # Validate signing_root if provided (must be 32 bytes = 64 hex chars)
+        if self.signing_root is not None:
+            signing_root_clean = self.signing_root.replace("0x", "")
+            if len(signing_root_clean) != 64:
+                raise ValueError("signingRoot must be 32 bytes (64 hex characters)")
+            try:
+                bytes.fromhex(signing_root_clean)
+            except ValueError:
+                raise ValueError("signingRoot must be valid hexadecimal")
         
         # Validate domain if provided (must be 4 bytes = 8 hex chars)
         if self.domain is not None:
@@ -305,6 +306,11 @@ class APIHandler:
             )
         
         # Convert hex to bytes
+        if sign_req.signing_root is None:
+            raise web.HTTPBadRequest(
+                text=json.dumps({"error": "signingRoot is required (py3signer does not compute signing roots from SSZ data)"}),
+                content_type="application/json"
+            )
         message = bytes.fromhex(sign_req.signing_root.replace("0x", ""))
         
         # Determine domain
