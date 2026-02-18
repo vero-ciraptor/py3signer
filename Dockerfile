@@ -28,6 +28,7 @@ COPY Cargo.toml .
 COPY rust/ rust/
 COPY py3signer/__init__.py py3signer/__init__.py
 COPY pyproject.toml .
+COPY README.md .
 
 # Create virtual environment and install maturin
 RUN uv venv
@@ -61,14 +62,20 @@ COPY py3signer/ py3signer/
 COPY --from=builder /build/dist/*.whl /tmp/
 
 # Create virtual environment and install dependencies
-RUN uv venv --system-site-packages=false
+RUN uv venv
 RUN uv pip install /tmp/*.whl aiohttp>=3.11.0 msgspec>=0.19.0
 
 # Clean up
 RUN rm /tmp/*.whl
 
+# Create uv cache directory with proper ownership
+RUN mkdir -p /app/.cache/uv && chown -R py3signer:py3signer /app/.cache
+
 # Change to non-root user
 USER py3signer
+
+# Set uv cache directory (writable by py3signer user)
+ENV UV_CACHE_DIR=/app/.cache/uv
 
 # Expose port
 EXPOSE 8080
