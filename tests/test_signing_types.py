@@ -344,9 +344,7 @@ class TestGetDomainForRequest:
                 genesis_validators_root="0x0",
             ),
             signing_root="0x" + "00" * 32,
-            sync_committee_message=SyncCommitteeMessageData(
-                slot="100", beacon_block_root="0x0"
-            ),
+            sync_committee_message=SyncCommitteeMessageData(slot="100", beacon_block_root="0x0"),
         )
         assert get_domain_for_request(request) == DOMAIN_SYNC_COMMITTEE
 
