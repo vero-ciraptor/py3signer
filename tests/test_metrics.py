@@ -4,7 +4,6 @@ from collections.abc import AsyncGenerator
 from typing import Any
 
 import pytest
-import pytest_asyncio
 from aiohttp.test_utils import TestClient, TestServer
 
 from py3signer import metrics
@@ -12,7 +11,7 @@ from py3signer.metrics_server import MetricsServer, create_metrics_app
 from py3signer.storage import KeyStorage
 
 
-@pytest_asyncio.fixture  # type: ignore[untyped-decorator]
+@pytest.fixture
 async def metrics_client() -> AsyncGenerator[TestClient[Any, Any], None]:
     """Create a test client for metrics server."""
     app = create_metrics_app()

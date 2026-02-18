@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import pytest_asyncio
 from aiohttp.test_utils import TestClient, TestServer
 
 from py3signer.config import Config
@@ -36,7 +35,7 @@ def storage() -> Generator[KeyStorage, None, None]:
     storage.clear()
 
 
-@pytest_asyncio.fixture  # type: ignore[untyped-decorator]
+@pytest.fixture
 async def client(config: Config) -> AsyncGenerator[TestClient[Any, Any], None]:
     """Create a test client."""
     app = create_app(config)
@@ -47,7 +46,7 @@ async def client(config: Config) -> AsyncGenerator[TestClient[Any, Any], None]:
     await client.close()
 
 
-@pytest_asyncio.fixture  # type: ignore[untyped-decorator]
+@pytest.fixture
 async def client_with_persistence(
     config_with_keystore_path: Config,
 ) -> AsyncGenerator[TestClient[Any, Any], None]:
