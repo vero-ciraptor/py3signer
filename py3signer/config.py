@@ -24,7 +24,6 @@ class Config(msgspec.Struct, frozen=True):
     auth_token: str | None = None
 
     # Metrics settings
-    metrics_enabled: bool = False
     metrics_host: str = "127.0.0.1"
     metrics_port: int = 8081
 
@@ -119,7 +118,6 @@ def get_config() -> Config:
         "tls_key": args.tls_key,
         "log_level": args.log_level,
         "auth_token": args.auth_token,
-        "metrics_enabled": args.metrics_enabled,
         "metrics_port": args.metrics_port,
         "metrics_host": args.metrics_host,
         "key_store_path": args.key_store_path,

@@ -85,10 +85,8 @@ async def run_server(config: Config) -> None:
     logger.info("PROFILING MODE: Sign endpoint returns timing data in _profile field")
 
     # Start metrics server if enabled
-    metrics_server: MetricsServer | None = None
-    if config.metrics_enabled:
-        metrics_server = MetricsServer(host=config.metrics_host, port=config.metrics_port)
-        await metrics_server.start()
+    metrics_server = MetricsServer(host=config.metrics_host, port=config.metrics_port)
+    await metrics_server.start()
 
     logger.info("Press Ctrl+C to stop")
 
@@ -99,8 +97,7 @@ async def run_server(config: Config) -> None:
     except asyncio.CancelledError:
         pass
     finally:
-        if metrics_server:
-            await metrics_server.stop()
+        await metrics_server.stop()
         await runner.cleanup()
 
 
