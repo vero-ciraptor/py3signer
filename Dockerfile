@@ -1,0 +1,84 @@
+# Multi-stage Dockerfile for py3signer using uv
+# Stage 1: Build Rust extension
+# Stage 2: Python runtime with uv
+
+# Stage 1: Build
+FROM python:3.12-slim-bookworm AS builder
+
+# Install Rust toolchain and build dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Set workdir
+WORKDIR /build
+
+# Copy project files
+COPY Cargo.toml .
+COPY rust/ rust/
+COPY py3signer/__init__.py py3signer/__init__.py
+COPY pyproject.toml .
+
+# Create virtual environment and install maturin
+RUN uv venv
+RUN uv pip install maturin
+
+# Build the Rust extension
+RUN uv run maturin build --release -o dist
+
+# Stage 2: Runtime
+FROM python:3.12-slim-bookworm
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libssl3 \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Create non-root user
+RUN groupadd -r py3signer && useradd -r -g py3signer py3signer
+
+# Set workdir
+WORKDIR /app
+
+# Copy Python package
+COPY py3signer/ py3signer/
+
+# Copy built extension from builder
+COPY --from=builder /build/dist/*.whl /tmp/
+
+# Create virtual environment and install dependencies
+RUN uv venv --system-site-packages=false
+RUN uv pip install /tmp/*.whl aiohttp>=3.11.0 msgspec>=0.19.0
+
+# Clean up
+RUN rm /tmp/*.whl
+
+# Change to non-root user
+USER py3signer
+
+# Expose port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
+
+# Set entrypoint using uv
+ENTRYPOINT ["uv", "run", "python", "-m", "py3signer"]
+
+# Default arguments
+CMD ["--host", "0.0.0.0", "--port", "8080"]

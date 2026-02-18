@@ -1,0 +1,19 @@
+# Example configuration file for py3signer
+# Copy to config.yaml and customize for your setup
+# Note: Environment variables can also be used with PY3SIGNER_ prefix
+
+# HTTP server settings
+host: 127.0.0.1  # Use 0.0.0.0 to listen on all interfaces (Docker recommended)
+port: 8080       # Port to listen on
+
+# Logging
+log_level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+# Optional: Enable TLS
+# tls_cert: /path/to/server.crt
+# tls_key: /path/to/server.key
+
+# Optional: Authentication
+# Set via environment variable for security: export PY3SIGNER_AUTH_TOKEN=your_secret
+# Or uncomment and set here (not recommended for production):
+# auth_token: your_secret_token_here
