@@ -91,6 +91,7 @@ def get_metrics_content_type() -> str:
 
 # HTTP middleware for tracking metrics
 
+
 @web.middleware
 async def metrics_middleware(
     request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
@@ -120,7 +121,9 @@ async def metrics_middleware(
                 parts[-1] = "{identifier}"
                 endpoint = "/".join(parts)
 
-        HTTP_REQUEST_DURATION_SECONDS.labels(method=request.method, endpoint=endpoint).observe(duration)
+        HTTP_REQUEST_DURATION_SECONDS.labels(method=request.method, endpoint=endpoint).observe(
+            duration
+        )
         HTTP_REQUESTS_TOTAL.labels(method=request.method, endpoint=endpoint, status=status).inc()
 
 
@@ -130,6 +133,7 @@ def setup_metrics_middleware(app: web.Application) -> None:
 
 
 # Metrics HTTP server
+
 
 async def metrics_handler(request: web.Request) -> web.Response:
     """Handler for the /metrics endpoint."""

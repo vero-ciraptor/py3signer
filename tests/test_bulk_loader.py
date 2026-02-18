@@ -148,7 +148,9 @@ class TestLoadKeystoresFromDirectory:
 
         # Copy test keystore
         keystore_data = json.loads((test_data / "test_keystore_scrypt.json").read_text())
-        keystore_data["pubkey"] = "a792e85e01746b22e89c7289aa693c4413db2c83d1209380cc4e98fc132ba49c301606032f77089d90e2df0539d23037"
+        keystore_data["pubkey"] = (
+            "a792e85e01746b22e89c7289aa693c4413db2c83d1209380cc4e98fc132ba49c301606032f77089d90e2df0539d23037"
+        )
         keystore1_json.write_text(json.dumps(keystore_data))
         keystore1_txt.write_text("testpassword123")
 

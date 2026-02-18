@@ -431,9 +431,7 @@ class TestAllSigningTypes:
             ("VALIDATOR_REGISTRATION", ValidatorRegistrationSignRequest),
         ],
     )
-    def test_all_types_discriminate(
-        self, type_name: str, expected_class: type
-    ) -> None:
+    def test_all_types_discriminate(self, type_name: str, expected_class: type) -> None:
         """Test that each type discriminator creates the correct class."""
         # Build minimal valid JSON for each type
         base_json: dict[str, Any] = {

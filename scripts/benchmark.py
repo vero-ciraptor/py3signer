@@ -102,8 +102,8 @@ class BenchmarkResult:
         """Format results as a string."""
         return f"""py3signer Benchmark
 ===================
-URL: {self._url or 'N/A'}
-Concurrency: {self._concurrency or 'N/A'}
+URL: {self._url or "N/A"}
+Concurrency: {self._concurrency or "N/A"}
 Total Requests: {self.total_requests}
 
 Results:
@@ -385,8 +385,14 @@ def create_signing_request() -> dict[str, Any]:
             "slot": "123",
             "index": "0",
             "beacon_block_root": "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "source": {"epoch": "0", "root": "0x0000000000000000000000000000000000000000000000000000000000000000"},
-            "target": {"epoch": "1", "root": "0x0000000000000000000000000000000000000000000000000000000000000000"},
+            "source": {
+                "epoch": "0",
+                "root": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            },
+            "target": {
+                "epoch": "1",
+                "root": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            },
         },
     }
 

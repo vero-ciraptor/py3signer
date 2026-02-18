@@ -1,12 +1,10 @@
 """In-memory key storage with optional disk persistence."""
 
-import json
 import logging
 import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
 
 from py3signer_core import PublicKey, SecretKey
 
@@ -121,7 +119,7 @@ class KeyStorage:
             Tuple of (pubkey_hex, persisted) where persisted indicates if disk write occurred.
         """
         pubkey_bytes = pubkey.to_bytes()
-        pubkey_hex = cast(str, pubkey_bytes.hex())
+        pubkey_hex = pubkey_bytes.hex()
 
         if pubkey_hex in self._keys:
             raise ValueError(f"Key already exists: {pubkey_hex}")

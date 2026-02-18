@@ -2,7 +2,6 @@
 
 import json
 import logging
-from typing import cast
 
 import msgspec
 from aiohttp import web
@@ -119,7 +118,7 @@ class APIHandler:
                 keystore = Keystore.from_json(keystore_json)
                 secret_key = keystore.decrypt(password)
                 pubkey = secret_key.public_key()
-                pubkey_hex = cast(str, pubkey.to_bytes().hex())
+                pubkey_hex = pubkey.to_bytes().hex()
 
                 if pubkey_hex in existing_keys:
                     results.append(
@@ -205,16 +204,12 @@ class APIHandler:
     async def add_remote_keys(self, request: web.Request) -> web.Response:
         """POST /eth/v1/remotekeys - Add remote keys (stub)."""
         await self._require_auth(request)
-        return web.json_response(
-            {"data": [], "message": "Remote keys not supported"}, status=501
-        )
+        return web.json_response({"data": [], "message": "Remote keys not supported"}, status=501)
 
     async def delete_remote_keys(self, request: web.Request) -> web.Response:
         """DELETE /eth/v1/remotekeys - Delete remote keys (stub)."""
         await self._require_auth(request)
-        return web.json_response(
-            {"data": [], "message": "Remote keys not supported"}, status=501
-        )
+        return web.json_response({"data": [], "message": "Remote keys not supported"}, status=501)
 
     async def list_public_keys(self, request: web.Request) -> web.Response:
         """GET /api/v1/eth2/publicKeys - List available BLS public keys."""

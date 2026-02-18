@@ -231,9 +231,9 @@ async def test_list_public_keys_after_import(
 @pytest.mark.asyncio
 async def test_auth_token_required(endpoint: str) -> None:
     """Test that auth token is required when configured."""
-    from aiohttp.test_utils import TestClient as AiohttpTestClient, TestServer
+    from aiohttp.test_utils import TestClient as AiohttpTestClient
+    from aiohttp.test_utils import TestServer
 
-    from py3signer.config import Config
     from py3signer.server import create_app
 
     config = Config(host="127.0.0.1", port=8080, auth_token="secret_token")
@@ -277,7 +277,6 @@ async def test_import_keystore_with_persistence(
 ) -> None:
     """Test that imported keystores are saved to disk when keystore_path is configured."""
     keystore_json = json.dumps(sample_keystore)
-    pubkey = sample_keystore["pubkey"].lower().replace("0x", "")
 
     # Import keystore
     resp = await client_with_persistence.post(
@@ -313,9 +312,7 @@ async def test_delete_keystore_with_persistence(
     assert resp.status == 200
 
     # Then delete
-    resp = await client_with_persistence.delete(
-        "/eth/v1/keystores", json={"pubkeys": [pubkey]}
-    )
+    resp = await client_with_persistence.delete("/eth/v1/keystores", json={"pubkeys": [pubkey]})
     assert resp.status == 200
 
     data = await resp.json()
@@ -392,7 +389,9 @@ async def test_sign_validation_errors(
 
 
 @pytest.mark.asyncio
-async def test_sign_key_not_found(client: TestClient[Any, Any], valid_fork_info: dict[str, Any]) -> None:
+async def test_sign_key_not_found(
+    client: TestClient[Any, Any], valid_fork_info: dict[str, Any]
+) -> None:
     """Test signing with non-existent key."""
     pubkey = "a" * 96
     resp = await client.post(

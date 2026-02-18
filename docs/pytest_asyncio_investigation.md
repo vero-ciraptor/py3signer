@@ -22,8 +22,8 @@
 When running tests without pytest-asyncio installed, pytest emits this warning/error:
 
 ```
-pytest.PytestRemovedIn9Warning: 'test_example' requested an async fixture 'client', 
-with no plugin or hook that handled it. This is usually an error, as pytest does not 
+pytest.PytestRemovedIn9Warning: 'test_example' requested an async fixture 'client',
+with no plugin or hook that handled it. This is usually an error, as pytest does not
 natively support it. This will turn into an error in pytest 9.
 
 See: https://docs.pytest.org/en/stable/deprecations.html#sync-test-depending-on-async-fixture

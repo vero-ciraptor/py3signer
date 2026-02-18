@@ -41,13 +41,17 @@ def scan_keystore_directory(directory: Path) -> dict[str, Path]:
         if password_file.exists():
             keystores[base_name] = json_file
         else:
-            logger.warning(f"Skipping {json_file.name}: no matching password file {password_file.name}")
+            logger.warning(
+                f"Skipping {json_file.name}: no matching password file {password_file.name}"
+            )
 
     logger.info(f"Found {len(keystores)} keystore(s) with matching password files")
     return keystores
 
 
-def load_keystore_with_password(keystore_path: Path, password_path: Path) -> tuple[PublicKey, SecretKey, str, str | None]:
+def load_keystore_with_password(
+    keystore_path: Path, password_path: Path
+) -> tuple[PublicKey, SecretKey, str, str | None]:
     """Load a single keystore with its password.
 
     Args:
@@ -98,7 +102,9 @@ def load_keystores_from_directory(directory: Path, storage: KeyStorage) -> tuple
         password_path = keystore_path.with_suffix(".txt")
 
         try:
-            pubkey, secret_key, path, description = load_keystore_with_password(keystore_path, password_path)
+            pubkey, secret_key, path, description = load_keystore_with_password(
+                keystore_path, password_path
+            )
             storage.add_key(pubkey, secret_key, path, description)
             logger.info(f"Loaded keystore: {base_name}")
             success_count += 1
