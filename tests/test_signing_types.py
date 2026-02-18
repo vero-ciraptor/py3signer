@@ -379,7 +379,7 @@ class TestGetDomainForRequest:
         assert get_domain_for_request(request) == DOMAIN_APPLICATION_MASK
 
 
-class TestValidatesigning_root:
+class TestValidateSigningRoot:
     """Tests for validate_signing_root function."""
 
     def test_valid_signing_root_with_prefix(self) -> None:
