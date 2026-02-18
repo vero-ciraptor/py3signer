@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -56,17 +57,17 @@ def sample_keystore_json() -> str:
 class TestStoragePersistence:
     """Test keystore persistence functionality."""
 
-    def test_storage_without_keystore_path(self):
+    def test_storage_without_keystore_path(self) -> None:
         """Test that storage works without a keystore path (in-memory only)."""
         storage = KeyStorage()
         assert storage.keystore_path is None
 
-    def test_storage_with_keystore_path(self, temp_keystore_dir: Path):
+    def test_storage_with_keystore_path(self, temp_keystore_dir: Path) -> None:
         """Test that storage accepts a keystore path."""
         storage = KeyStorage(keystore_path=temp_keystore_dir)
         assert storage.keystore_path == temp_keystore_dir
 
-    def test_save_keystore_to_disk_success(self, temp_keystore_dir: Path):
+    def test_save_keystore_to_disk_success(self, temp_keystore_dir: Path) -> None:
         """Test successful keystore save to disk."""
         storage = KeyStorage(keystore_path=temp_keystore_dir)
         pubkey_hex = "aabbccdd00112233" * 6  # 96 hex chars
@@ -85,13 +86,13 @@ class TestStoragePersistence:
         with open(temp_keystore_dir / f"{pubkey_hex}.txt") as f:
             assert f.read() == password
 
-    def test_save_keystore_without_keystore_path(self):
+    def test_save_keystore_without_keystore_path(self) -> None:
         """Test that save returns False when no keystore path is configured."""
         storage = KeyStorage()
         result = storage.save_keystore_to_disk("test", "{}", "password")
         assert result is False
 
-    def test_save_keystore_creates_directory(self, tmp_path: Path):
+    def test_save_keystore_creates_directory(self, tmp_path: Path) -> None:
         """Test that save_keystore_to_disk creates the directory if it doesn't exist."""
         nested_dir = tmp_path / "nested" / "keystore" / "dir"
         storage = KeyStorage(keystore_path=nested_dir)
@@ -101,7 +102,7 @@ class TestStoragePersistence:
         assert result is True
         assert nested_dir.exists()
 
-    def test_delete_keystore_from_disk_success(self, temp_keystore_dir: Path):
+    def test_delete_keystore_from_disk_success(self, temp_keystore_dir: Path) -> None:
         """Test successful keystore deletion from disk."""
         storage = KeyStorage(keystore_path=temp_keystore_dir)
         pubkey_hex = "testpubkey" * 6
@@ -118,7 +119,7 @@ class TestStoragePersistence:
         assert not keystore_file.exists()
         assert not password_file.exists()
 
-    def test_delete_keystore_without_files(self, temp_keystore_dir: Path):
+    def test_delete_keystore_without_files(self, temp_keystore_dir: Path) -> None:
         """Test deleting keystore when files don't exist (should succeed)."""
         storage = KeyStorage(keystore_path=temp_keystore_dir)
         pubkey_hex = "nonexistent" * 6
@@ -127,16 +128,14 @@ class TestStoragePersistence:
 
         assert result is True  # Should succeed even if files don't exist
 
-    def test_delete_keystore_without_keystore_path(self):
+    def test_delete_keystore_without_keystore_path(self) -> None:
         """Test that delete returns False when no keystore path is configured."""
         storage = KeyStorage()
         result = storage.delete_keystore_from_disk("test")
         assert result is False
 
-    def test_add_key_with_persistence(self, temp_keystore_dir: Path):
+    def test_add_key_with_persistence(self, temp_keystore_dir: Path) -> None:
         """Test adding a key with persistence enabled."""
-        from unittest.mock import MagicMock
-
         storage = KeyStorage(keystore_path=temp_keystore_dir)
         pubkey = MagicMock()
         pubkey.to_bytes.return_value = bytes.fromhex("aabbccdd" * 12)
@@ -156,10 +155,8 @@ class TestStoragePersistence:
         assert (temp_keystore_dir / f"{pubkey_hex}.json").exists()
         assert (temp_keystore_dir / f"{pubkey_hex}.txt").exists()
 
-    def test_add_key_with_persistence_disabled(self):
+    def test_add_key_with_persistence_disabled(self) -> None:
         """Test adding a key when persistence is disabled (no keystore_path)."""
-        from unittest.mock import MagicMock
-
         storage = KeyStorage()
         pubkey = MagicMock()
         pubkey.to_bytes.return_value = bytes.fromhex("aabbccdd" * 12)
@@ -167,7 +164,7 @@ class TestStoragePersistence:
         keystore_json = '{"version": 4}'
         password = "testpass"
 
-        pubkey_hex, persisted = storage.add_key_with_persistence(
+        _pubkey_hex, persisted = storage.add_key_with_persistence(
             pubkey=pubkey,
             secret_key=secret_key,
             keystore_json=keystore_json,
@@ -177,10 +174,8 @@ class TestStoragePersistence:
 
         assert persisted is False
 
-    def test_remove_key_with_persistence(self, temp_keystore_dir: Path):
+    def test_remove_key_with_persistence(self, temp_keystore_dir: Path) -> None:
         """Test removing a key with persistence enabled."""
-        from unittest.mock import MagicMock
-
         storage = KeyStorage(keystore_path=temp_keystore_dir)
         pubkey_hex = "aabbccdd" * 12
         pubkey = MagicMock()
@@ -201,7 +196,7 @@ class TestStoragePersistence:
         assert not (temp_keystore_dir / f"{pubkey_hex}.json").exists()
         assert not (temp_keystore_dir / f"{pubkey_hex}.txt").exists()
 
-    def test_remove_key_with_persistence_not_in_storage(self, temp_keystore_dir: Path):
+    def test_remove_key_with_persistence_not_in_storage(self, temp_keystore_dir: Path) -> None:
         """Test removing a key that doesn't exist in storage."""
         storage = KeyStorage(keystore_path=temp_keystore_dir)
         pubkey_hex = "nonexistent" * 6
@@ -211,7 +206,7 @@ class TestStoragePersistence:
         assert removed_from_memory is False
         assert deleted_from_disk is False  # No disk deletion attempted since key wasn't in memory
 
-    def test_atomic_write(self, temp_keystore_dir: Path):
+    def test_atomic_write(self, temp_keystore_dir: Path) -> None:
         """Test that keystore writes are atomic (temp file + rename)."""
         storage = KeyStorage(keystore_path=temp_keystore_dir)
         pubkey_hex = "testpubkey" * 6
@@ -229,7 +224,7 @@ class TestStoragePersistence:
         assert (temp_keystore_dir / f"{pubkey_hex}.json").exists()
         assert (temp_keystore_dir / f"{pubkey_hex}.txt").exists()
 
-    def test_pubkey_hex_normalization(self, temp_keystore_dir: Path):
+    def test_pubkey_hex_normalization(self, temp_keystore_dir: Path) -> None:
         """Test that pubkey hex is normalized to lowercase."""
         storage = KeyStorage(keystore_path=temp_keystore_dir)
         pubkey_hex_mixed = "AABBCCDD0011" * 8
@@ -240,7 +235,7 @@ class TestStoragePersistence:
         # Files should be created with lowercase name
         assert (temp_keystore_dir / f"{pubkey_hex_lower}.json").exists()
 
-    def test_overwrite_existing_keystore(self, temp_keystore_dir: Path):
+    def test_overwrite_existing_keystore(self, temp_keystore_dir: Path) -> None:
         """Test that saving over an existing keystore overwrites it."""
         storage = KeyStorage(keystore_path=temp_keystore_dir)
         pubkey_hex = "testpubkey" * 6

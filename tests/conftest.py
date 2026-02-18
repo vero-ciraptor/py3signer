@@ -1,7 +1,9 @@
 """Test fixtures and utilities."""
 
 import json
+from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
+from typing import Any
 
 import pytest
 import pytest_asyncio
@@ -19,7 +21,7 @@ def config() -> Config:
 
 
 @pytest.fixture
-def config_with_keystore_path(tmp_path) -> Config:
+def config_with_keystore_path(tmp_path: Path) -> Config:
     """Create a test configuration with a keystore path."""
     keystore_path = tmp_path / "keystores"
     keystore_path.mkdir()
@@ -27,15 +29,15 @@ def config_with_keystore_path(tmp_path) -> Config:
 
 
 @pytest.fixture
-def storage() -> KeyStorage:
+def storage() -> Generator[KeyStorage, None, None]:
     """Create a fresh key storage."""
     storage = KeyStorage()
     yield storage
     storage.clear()
 
 
-@pytest_asyncio.fixture
-async def client(config: Config):
+@pytest_asyncio.fixture  # type: ignore[untyped-decorator]
+async def client(config: Config) -> AsyncGenerator[TestClient[Any, Any], None]:
     """Create a test client."""
     app = create_app(config)
     server = TestServer(app)
@@ -45,8 +47,10 @@ async def client(config: Config):
     await client.close()
 
 
-@pytest_asyncio.fixture
-async def client_with_persistence(config_with_keystore_path: Config):
+@pytest_asyncio.fixture  # type: ignore[untyped-decorator]
+async def client_with_persistence(
+    config_with_keystore_path: Config,
+) -> AsyncGenerator[TestClient[Any, Any], None]:
     """Create a test client with keystore persistence enabled."""
     app = create_app(config_with_keystore_path)
     server = TestServer(app)
@@ -57,7 +61,7 @@ async def client_with_persistence(config_with_keystore_path: Config):
 
 
 @pytest.fixture
-def sample_keystore() -> dict:
+def sample_keystore() -> dict[str, Any]:
     """Return a sample EIP-2335 keystore for testing.
 
     This is a real, valid keystore that can be decrypted with
@@ -67,7 +71,8 @@ def sample_keystore() -> dict:
     # Load the pre-generated scrypt keystore from test data
     keystore_path = Path(__file__).parent / "data" / "test_keystore_scrypt.json"
     with open(keystore_path) as f:
-        return json.load(f)
+        data: dict[str, Any] = json.load(f)
+        return data
 
 
 @pytest.fixture

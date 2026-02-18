@@ -1,5 +1,8 @@
 """Tests for Prometheus metrics functionality."""
 
+from collections.abc import AsyncGenerator
+from typing import Any
+
 import pytest
 import pytest_asyncio
 from aiohttp.test_utils import TestClient, TestServer
@@ -9,8 +12,8 @@ from py3signer.metrics_server import MetricsServer, create_metrics_app
 from py3signer.storage import KeyStorage
 
 
-@pytest_asyncio.fixture
-async def metrics_client():
+@pytest_asyncio.fixture  # type: ignore[untyped-decorator]
+async def metrics_client() -> AsyncGenerator[TestClient[Any, Any], None]:
     """Create a test client for metrics server."""
     app = create_metrics_app()
     server = TestServer(app)
@@ -21,7 +24,9 @@ async def metrics_client():
 
 
 @pytest.mark.asyncio
-async def test_metrics_endpoint_returns_prometheus_format(metrics_client):
+async def test_metrics_endpoint_returns_prometheus_format(
+    metrics_client: TestClient[Any, Any],
+) -> None:
     """Test that /metrics endpoint returns Prometheus format."""
     resp = await metrics_client.get("/metrics")
     assert resp.status == 200
@@ -41,7 +46,7 @@ async def test_metrics_endpoint_returns_prometheus_format(metrics_client):
 
 
 @pytest.mark.asyncio
-async def test_metrics_endpoint_health(metrics_client):
+async def test_metrics_endpoint_health(metrics_client: TestClient[Any, Any]) -> None:
     """Test metrics server health endpoint."""
     resp = await metrics_client.get("/health")
     assert resp.status == 200
@@ -51,7 +56,7 @@ async def test_metrics_endpoint_health(metrics_client):
 
 
 @pytest.mark.asyncio
-async def test_keys_loaded_gauge(metrics_client):
+async def test_keys_loaded_gauge(metrics_client: TestClient[Any, Any]) -> None:
     """Test that keys_loaded gauge reflects key count."""
     # Start fresh with 0 keys
     metrics.KEYS_LOADED.set(0)
@@ -89,7 +94,7 @@ async def test_keys_loaded_gauge(metrics_client):
 
 
 @pytest.mark.asyncio
-async def test_metrics_server_start_stop():
+async def test_metrics_server_start_stop() -> None:
     """Test metrics server can start and stop."""
     server = MetricsServer(host="127.0.0.1", port=18081)
 
@@ -110,7 +115,7 @@ async def test_metrics_server_start_stop():
 
 
 @pytest.mark.asyncio
-async def test_metrics_server_context_manager():
+async def test_metrics_server_context_manager() -> None:
     """Test metrics server context manager."""
     import aiohttp
 
@@ -120,7 +125,7 @@ async def test_metrics_server_context_manager():
                 assert resp.status == 200
 
 
-def test_metrics_content_type():
+def test_metrics_content_type() -> None:
     """Test metrics content type helper."""
     from py3signer.metrics import get_metrics_content_type
 
@@ -128,7 +133,7 @@ def test_metrics_content_type():
     assert "text/plain" in content_type
 
 
-def test_metrics_output():
+def test_metrics_output() -> None:
     """Test metrics output generation."""
     from py3signer.metrics import get_metrics_output
 

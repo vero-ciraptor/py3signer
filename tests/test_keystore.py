@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -11,7 +12,7 @@ from py3signer.keystore import Keystore, KeystoreError
 class TestKeystore:
     """Tests for Keystore class."""
 
-    def test_from_json_valid(self, sample_keystore: dict) -> None:
+    def test_from_json_valid(self, sample_keystore: dict[str, Any]) -> None:
         """Test loading valid keystore from JSON."""
         keystore_json = json.dumps(sample_keystore)
         ks = Keystore.from_json(keystore_json)
@@ -28,7 +29,7 @@ class TestKeystore:
 
     def test_missing_required_field(self) -> None:
         """Test validation of required fields."""
-        incomplete: dict = {"crypto": {}, "version": 4}
+        incomplete: dict[str, Any] = {"crypto": {}, "version": 4}
 
         # msgspec.Struct raises TypeError for missing required fields
         with pytest.raises((KeystoreError, TypeError)):
@@ -36,7 +37,7 @@ class TestKeystore:
 
     def test_invalid_crypto_structure(self) -> None:
         """Test validation of crypto structure."""
-        bad_crypto: dict = {
+        bad_crypto: dict[str, Any] = {
             "crypto": {"kdf": {}},  # Missing checksum and cipher
             "pubkey": "aa" * 48,
             "path": "m/12381/3600/0/0/0",
@@ -48,7 +49,7 @@ class TestKeystore:
             Keystore(**bad_crypto)
         assert "Invalid crypto structure" in str(exc_info.value)
 
-    def test_description_property(self, sample_keystore: dict) -> None:
+    def test_description_property(self, sample_keystore: dict[str, Any]) -> None:
         """Test description property."""
         keystore_json = json.dumps(sample_keystore)
         ks = Keystore.from_json(keystore_json)
@@ -57,7 +58,7 @@ class TestKeystore:
 
     def test_description_optional(self) -> None:
         """Test that description is optional."""
-        keystore_data: dict = {
+        keystore_data: dict[str, Any] = {
             "crypto": {
                 "kdf": {
                     "function": "scrypt",
@@ -150,7 +151,7 @@ class TestKeystoreDecryption:
 class TestKeystoreDecryptionLegacy:
     """Legacy tests using sample_keystore fixture."""
 
-    def test_decrypt_wrong_password(self, sample_keystore: dict) -> None:
+    def test_decrypt_wrong_password(self, sample_keystore: dict[str, Any]) -> None:
         """Test decryption with wrong password."""
         keystore_json = json.dumps(sample_keystore)
         ks = Keystore.from_json(keystore_json)

@@ -1,13 +1,17 @@
 """Tests for API endpoints."""
 
 import json
+from typing import Any
 
 import pytest
+from aiohttp.test_utils import TestClient
+
+from py3signer.config import Config
 
 
 # Valid fork info fixture for tests
 @pytest.fixture
-def valid_fork_info():
+def valid_fork_info() -> dict[str, Any]:
     """Return a valid fork info structure."""
     return {
         "fork": {"previous_version": "0x00000000", "current_version": "0x00000000", "epoch": "0"},
@@ -16,7 +20,7 @@ def valid_fork_info():
 
 
 @pytest.mark.asyncio
-async def test_health_endpoint(client):
+async def test_health_endpoint(client: TestClient[Any, Any]) -> None:
     """Test the health check endpoint."""
     resp = await client.get("/health")
     assert resp.status == 200
@@ -35,7 +39,9 @@ async def test_health_endpoint(client):
     ],
 )
 @pytest.mark.asyncio
-async def test_list_empty(client, endpoint, extract_key):
+async def test_list_empty(
+    client: TestClient[Any, Any], endpoint: str, extract_key: str | None
+) -> None:
     """Test listing endpoints when none are loaded."""
     resp = await client.get(endpoint)
     assert resp.status == 200
@@ -47,7 +53,7 @@ async def test_list_empty(client, endpoint, extract_key):
 
 
 @pytest.mark.asyncio
-async def test_import_keystore_invalid_json(client):
+async def test_import_keystore_invalid_json(client: TestClient[Any, Any]) -> None:
     """Test importing with invalid JSON."""
     resp = await client.post(
         "/eth/v1/keystores", data="not json", headers={"Content-Type": "application/json"}
@@ -63,7 +69,9 @@ async def test_import_keystore_invalid_json(client):
     ],
 )
 @pytest.mark.asyncio
-async def test_import_keystore_validation_errors(client, keystores, passwords, expected_error):
+async def test_import_keystore_validation_errors(
+    client: TestClient[Any, Any], keystores: list[str], passwords: list[str], expected_error: str
+) -> None:
     """Test importing with various validation errors."""
     resp = await client.post(
         "/eth/v1/keystores", json={"keystores": keystores, "passwords": passwords}
@@ -75,7 +83,9 @@ async def test_import_keystore_validation_errors(client, keystores, passwords, e
 
 
 @pytest.mark.asyncio
-async def test_import_keystore_success(client, sample_keystore, sample_keystore_password):
+async def test_import_keystore_success(
+    client: TestClient[Any, Any], sample_keystore: dict[str, Any], sample_keystore_password: str
+) -> None:
     """Test successful keystore import."""
     keystore_json = json.dumps(sample_keystore)
 
@@ -91,7 +101,9 @@ async def test_import_keystore_success(client, sample_keystore, sample_keystore_
 
 
 @pytest.mark.asyncio
-async def test_import_keystore_wrong_password(client, sample_keystore):
+async def test_import_keystore_wrong_password(
+    client: TestClient[Any, Any], sample_keystore: dict[str, Any]
+) -> None:
     """Test importing with wrong password."""
     keystore_json = json.dumps(sample_keystore)
 
@@ -105,7 +117,9 @@ async def test_import_keystore_wrong_password(client, sample_keystore):
 
 
 @pytest.mark.asyncio
-async def test_list_keystores_after_import(client, sample_keystore, sample_keystore_password):
+async def test_list_keystores_after_import(
+    client: TestClient[Any, Any], sample_keystore: dict[str, Any], sample_keystore_password: str
+) -> None:
     """Test listing keystores after importing."""
     # First import a keystore
     keystore_json = json.dumps(sample_keystore)
@@ -125,7 +139,9 @@ async def test_list_keystores_after_import(client, sample_keystore, sample_keyst
 
 
 @pytest.mark.asyncio
-async def test_delete_keystore(client, sample_keystore, sample_keystore_password):
+async def test_delete_keystore(
+    client: TestClient[Any, Any], sample_keystore: dict[str, Any], sample_keystore_password: str
+) -> None:
     """Test deleting a keystore."""
     # First import
     keystore_json = json.dumps(sample_keystore)
@@ -148,7 +164,7 @@ async def test_delete_keystore(client, sample_keystore, sample_keystore_password
 
 
 @pytest.mark.asyncio
-async def test_delete_nonexistent_keystore(client):
+async def test_delete_nonexistent_keystore(client: TestClient[Any, Any]) -> None:
     """Test deleting a keystore that doesn't exist."""
     resp = await client.delete("/eth/v1/keystores", json={"pubkeys": ["a" * 96]})
     assert resp.status == 200
@@ -158,14 +174,14 @@ async def test_delete_nonexistent_keystore(client):
 
 
 @pytest.mark.asyncio
-async def test_delete_empty_pubkeys(client):
+async def test_delete_empty_pubkeys(client: TestClient[Any, Any]) -> None:
     """Test deleting with empty pubkeys array."""
     resp = await client.delete("/eth/v1/keystores", json={"pubkeys": []})
     assert resp.status == 400
 
 
 @pytest.mark.asyncio
-async def test_remote_keys_stub(client):
+async def test_remote_keys_stub(client: TestClient[Any, Any]) -> None:
     """Test remote keys endpoints return stubs."""
     resp = await client.get("/eth/v1/remotekeys")
     assert resp.status == 200
@@ -181,7 +197,9 @@ async def test_remote_keys_stub(client):
 
 
 @pytest.mark.asyncio
-async def test_list_public_keys_after_import(client, sample_keystore, sample_keystore_password):
+async def test_list_public_keys_after_import(
+    client: TestClient[Any, Any], sample_keystore: dict[str, Any], sample_keystore_password: str
+) -> None:
     """Test listing public keys after importing keystores."""
     # First import a keystore
     keystore_json = json.dumps(sample_keystore)
@@ -211,9 +229,9 @@ async def test_list_public_keys_after_import(client, sample_keystore, sample_key
     ],
 )
 @pytest.mark.asyncio
-async def test_auth_token_required(endpoint):
+async def test_auth_token_required(endpoint: str) -> None:
     """Test that auth token is required when configured."""
-    from aiohttp.test_utils import TestClient, TestServer
+    from aiohttp.test_utils import TestClient as AiohttpTestClient, TestServer
 
     from py3signer.config import Config
     from py3signer.server import create_app
@@ -222,7 +240,7 @@ async def test_auth_token_required(endpoint):
 
     app = create_app(config)
     server = TestServer(app)
-    client = TestClient(server)
+    client = AiohttpTestClient(server)
     await client.start_server()
 
     try:
@@ -242,7 +260,7 @@ async def test_auth_token_required(endpoint):
 
 
 @pytest.mark.asyncio
-async def test_sign_missing_identifier(client):
+async def test_sign_missing_identifier(client: TestClient[Any, Any]) -> None:
     """Test signing without identifier."""
     resp = await client.post("/api/v1/eth2/sign/", json={})
     assert resp.status in [404, 405]  # Route not found or method not allowed
@@ -253,8 +271,10 @@ async def test_sign_missing_identifier(client):
 
 @pytest.mark.asyncio
 async def test_import_keystore_with_persistence(
-    client_with_persistence, sample_keystore, sample_keystore_password
-):
+    client_with_persistence: TestClient[Any, Any],
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+) -> None:
     """Test that imported keystores are saved to disk when keystore_path is configured."""
     keystore_json = json.dumps(sample_keystore)
     pubkey = sample_keystore["pubkey"].lower().replace("0x", "")
@@ -276,12 +296,14 @@ async def test_import_keystore_with_persistence(
 
 @pytest.mark.asyncio
 async def test_delete_keystore_with_persistence(
-    client_with_persistence, sample_keystore, sample_keystore_password
-):
+    client_with_persistence: TestClient[Any, Any],
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+) -> None:
     """Test that deleted keystores are removed from disk when keystore_path is configured."""
     keystore_json = json.dumps(sample_keystore)
     pubkey = sample_keystore["pubkey"]
-    pubkey_normalized = pubkey.lower().replace("0x", "")
+    _pubkey_normalized = pubkey.lower().replace("0x", "")
 
     # First import
     resp = await client_with_persistence.post(
@@ -301,7 +323,9 @@ async def test_delete_keystore_with_persistence(
 
 
 @pytest.mark.asyncio
-async def test_import_duplicate_keystore(client, sample_keystore, sample_keystore_password):
+async def test_import_duplicate_keystore(
+    client: TestClient[Any, Any], sample_keystore: dict[str, Any], sample_keystore_password: str
+) -> None:
     """Test that importing a duplicate keystore returns proper error."""
     keystore_json = json.dumps(sample_keystore)
 
@@ -348,7 +372,12 @@ async def test_import_duplicate_keystore(client, sample_keystore, sample_keystor
     ],
 )
 @pytest.mark.asyncio
-async def test_sign_validation_errors(client, valid_fork_info, request_body, expected_error):
+async def test_sign_validation_errors(
+    client: TestClient[Any, Any],
+    valid_fork_info: dict[str, Any],
+    request_body: dict[str, Any],
+    expected_error: str,
+) -> None:
     """Test signing with various validation errors."""
     # Add fork_info to requests that need it
     if "fork_info" not in request_body and "type" in request_body:
@@ -363,7 +392,7 @@ async def test_sign_validation_errors(client, valid_fork_info, request_body, exp
 
 
 @pytest.mark.asyncio
-async def test_sign_key_not_found(client, valid_fork_info):
+async def test_sign_key_not_found(client: TestClient[Any, Any], valid_fork_info: dict[str, Any]) -> None:
     """Test signing with non-existent key."""
     pubkey = "a" * 96
     resp = await client.post(
@@ -385,7 +414,9 @@ async def test_sign_key_not_found(client, valid_fork_info):
 
 
 @pytest.mark.asyncio
-async def test_sign_missing_signing_root(client, valid_fork_info):
+async def test_sign_missing_signing_root(
+    client: TestClient[Any, Any], valid_fork_info: dict[str, Any]
+) -> None:
     """Test signing without signingRoot (required until SSZ computation is implemented)."""
     pubkey = "a" * 96
     resp = await client.post(
@@ -409,7 +440,12 @@ async def test_sign_missing_signing_root(client, valid_fork_info):
 
 
 @pytest.mark.asyncio
-async def test_sign_attestation(client, sample_keystore, sample_keystore_password, valid_fork_info):
+async def test_sign_attestation(
+    client: TestClient[Any, Any],
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+    valid_fork_info: dict[str, Any],
+) -> None:
     """Test signing an attestation with spec-compliant format."""
     # First import a keystore
     keystore_json = json.dumps(sample_keystore)
@@ -445,7 +481,12 @@ async def test_sign_attestation(client, sample_keystore, sample_keystore_passwor
 
 
 @pytest.mark.asyncio
-async def test_sign_randao(client, sample_keystore, sample_keystore_password, valid_fork_info):
+async def test_sign_randao(
+    client: TestClient[Any, Any],
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+    valid_fork_info: dict[str, Any],
+) -> None:
     """Test signing a RANDAO reveal with spec-compliant format."""
     # First import a keystore
     keystore_json = json.dumps(sample_keystore)
@@ -474,8 +515,11 @@ async def test_sign_randao(client, sample_keystore, sample_keystore_password, va
 
 @pytest.mark.asyncio
 async def test_sign_voluntary_exit(
-    client, sample_keystore, sample_keystore_password, valid_fork_info
-):
+    client: TestClient[Any, Any],
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+    valid_fork_info: dict[str, Any],
+) -> None:
     """Test signing a voluntary exit with spec-compliant format."""
     # First import a keystore
     keystore_json = json.dumps(sample_keystore)
@@ -503,7 +547,12 @@ async def test_sign_voluntary_exit(
 
 
 @pytest.mark.asyncio
-async def test_sign_block_v2(client, sample_keystore, sample_keystore_password, valid_fork_info):
+async def test_sign_block_v2(
+    client: TestClient[Any, Any],
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+    valid_fork_info: dict[str, Any],
+) -> None:
     """Test signing a block with spec-compliant BLOCK_V2 format."""
     # First import a keystore
     keystore_json = json.dumps(sample_keystore)
@@ -540,7 +589,12 @@ async def test_sign_block_v2(client, sample_keystore, sample_keystore_password, 
 
 
 @pytest.mark.asyncio
-async def test_full_flow(client, sample_keystore, sample_keystore_password, valid_fork_info):
+async def test_full_flow(
+    client: TestClient[Any, Any],
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+    valid_fork_info: dict[str, Any],
+) -> None:
     """Test the full import -> list -> sign -> delete flow with spec-compliant format."""
     # 1. Import
     keystore_json = json.dumps(sample_keystore)
