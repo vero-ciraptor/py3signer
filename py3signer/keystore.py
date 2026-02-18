@@ -3,7 +3,7 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from py3signer_core import SecretKey, decrypt_keystore
 
@@ -61,22 +61,22 @@ class Keystore:
     @property
     def pubkey(self) -> str:
         """Get the public key hex string."""
-        return self.data["pubkey"]
+        return cast(str, self.data["pubkey"])
 
     @property
     def uuid(self) -> str:
         """Get the keystore UUID."""
-        return self.data["uuid"]
+        return cast(str, self.data["uuid"])
 
     @property
     def path(self) -> str:
         """Get the derivation path."""
-        return self.data["path"]
+        return cast(str, self.data["path"])
 
     @property
     def description(self) -> str | None:
         """Get the optional description."""
-        return self.data.get("description")
+        return cast(str | None, self.data.get("description"))
 
     def decrypt(self, password: str) -> SecretKey:
         """Decrypt the keystore and return the secret key."""

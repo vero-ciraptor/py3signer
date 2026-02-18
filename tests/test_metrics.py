@@ -114,7 +114,7 @@ async def test_metrics_server_context_manager():
     """Test metrics server context manager."""
     import aiohttp
 
-    async with MetricsServer(host="127.0.0.1", port=18082) as server:
+    async with MetricsServer(host="127.0.0.1", port=18082) as _server:
         async with aiohttp.ClientSession() as session:
             async with session.get("http://127.0.0.1:18082/metrics") as resp:
                 assert resp.status == 200

@@ -126,7 +126,7 @@ class APIHandler:
                 secret_key = keystore.decrypt(password)
                 pubkey = secret_key.public_key()
 
-                pubkey_hex = self._storage.add_key(
+                self._storage.add_key(
                     pubkey=pubkey,
                     secret_key=secret_key,
                     path=keystore.path,

@@ -2,6 +2,7 @@
 
 import logging
 from dataclasses import dataclass
+from typing import cast
 
 from py3signer_core import PublicKey, SecretKey
 
@@ -36,7 +37,7 @@ class KeyStorage:
     ) -> str:
         """Add a key to storage. Returns the public key hex."""
         pubkey_bytes = pubkey.to_bytes()
-        pubkey_hex = pubkey_bytes.hex()
+        pubkey_hex = cast(str, pubkey_bytes.hex())
 
         if pubkey_hex in self._keys:
             raise ValueError(f"Key already exists: {pubkey_hex}")

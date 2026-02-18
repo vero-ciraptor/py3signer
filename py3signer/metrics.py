@@ -4,6 +4,8 @@ This module defines and exposes all Prometheus metrics used by py3signer.
 Metrics are opt-in and only collected when --metrics-enabled is set.
 """
 
+from typing import cast
+
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
@@ -77,11 +79,11 @@ HTTP_REQUEST_DURATION_SECONDS = Histogram(
 )
 
 
-def get_metrics_output():
+def get_metrics_output() -> bytes:
     """Generate Prometheus-formatted metrics output."""
-    return generate_latest(REGISTRY)
+    return cast(bytes, generate_latest(REGISTRY))
 
 
-def get_metrics_content_type():
+def get_metrics_content_type() -> str:
     """Get the content type for Prometheus metrics."""
-    return CONTENT_TYPE_LATEST
+    return cast(str, CONTENT_TYPE_LATEST)

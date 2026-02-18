@@ -1,5 +1,8 @@
 """Test fixtures and utilities."""
 
+import json
+from pathlib import Path
+
 import pytest
 import pytest_asyncio
 from aiohttp.test_utils import TestClient, TestServer
@@ -32,10 +35,6 @@ async def client(config: Config):
     await client.start_server()
     yield client
     await client.close()
-
-
-import json
-from pathlib import Path
 
 
 @pytest.fixture
