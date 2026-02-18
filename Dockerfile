@@ -5,6 +5,9 @@
 # Stage 1: Build
 FROM python:3.12-slim-bookworm AS builder
 
+# Use bash with pipefail for safer pipe operations
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 # Install Rust toolchain and build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl=7.88.* \
@@ -30,12 +33,10 @@ COPY py3signer/__init__.py py3signer/__init__.py
 COPY pyproject.toml .
 COPY README.md .
 
-# Create virtual environment and install maturin
-RUN uv venv
-RUN uv pip install maturin
-
-# Build the Rust extension
-RUN uv run maturin build --release -o dist
+# Create virtual environment, install maturin, and build the Rust extension
+RUN uv venv && \
+    uv pip install maturin && \
+    uv run maturin build --release -o dist
 
 # Stage 2: Runtime
 FROM python:3.12-slim-bookworm
@@ -61,15 +62,11 @@ COPY py3signer/ py3signer/
 # Copy built extension from builder
 COPY --from=builder /build/dist/*.whl /tmp/
 
-# Create virtual environment and install dependencies
-RUN uv venv
-RUN uv pip install "/tmp/*.whl" "aiohttp>=3.11.0" "msgspec>=0.19.0"
-
-# Clean up
-RUN rm /tmp/*.whl
-
-# Create uv cache directory with proper ownership
-RUN mkdir -p /app/.cache/uv && chown -R py3signer:py3signer /app/.cache
+# Create virtual environment, install dependencies, clean up, and create cache directory
+RUN uv venv && \
+    uv pip install "/tmp/*.whl" "aiohttp>=3.11.0" "msgspec>=0.19.0" && \
+    rm /tmp/*.whl && \
+    mkdir -p /app/.cache/uv && chown -R py3signer:py3signer /app/.cache
 
 # Change to non-root user
 USER py3signer
