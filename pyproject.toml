@@ -77,3 +77,7 @@ indent-style = "space"
 [tool.mypy]
 python_version = "3.12"
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["py3signer_core"]
+ignore_missing_imports = true

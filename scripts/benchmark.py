@@ -14,7 +14,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import aiohttp
 
@@ -28,6 +28,8 @@ class BenchmarkResult:
     successful_requests: int
     failed_requests: int
     latencies: list[float]
+    _url: str = ""
+    _concurrency: int = 0
 
     @property
     def signatures_per_second(self) -> float:
@@ -100,8 +102,8 @@ class BenchmarkResult:
         """Format results as a string."""
         return f"""py3signer Benchmark
 ===================
-URL: {getattr(self, '_url', 'N/A')}
-Concurrency: {getattr(self, '_concurrency', 'N/A')}
+URL: {self._url or 'N/A'}
+Concurrency: {self._concurrency or 'N/A'}
 Total Requests: {self.total_requests}
 
 Results:
@@ -253,7 +255,7 @@ async def import_test_keystore(
                 if data.get("data") and len(data["data"]) > 0:
                     status = data["data"][0].get("status")
                     if status in ("imported", "duplicate"):
-                        return SAMPLE_KEYSTORE["pubkey"]
+                        return cast(str, SAMPLE_KEYSTORE["pubkey"])
                     print(f"Keystore import failed: {data['data'][0].get('message', status)}")
                     return None
             else:
@@ -275,7 +277,7 @@ async def load_keystores_from_path(
     if auth_token:
         headers["Authorization"] = f"Bearer {auth_token}"
 
-    pubkeys = []
+    pubkeys: list[str] = []
     keystore_path = Path(key_store_path)
 
     if not keystore_path.exists():
@@ -309,21 +311,21 @@ async def load_keystores_from_path(
             keystore_data = json.loads(ks_file.read_text())
 
             # Try to find password
-            password = None
+            ks_password: str | None = None
             ks_name = ks_file.stem
 
             # Check for password file with same name
             if ks_name in password_map:
-                password = password_map[ks_name]
+                ks_password = password_map[ks_name]
             elif "password" in password_map:
-                password = password_map["password"]
+                ks_password = password_map["password"]
             else:
                 # Try common passwords
-                password = SAMPLE_KEYSTORE_PASSWORD
+                ks_password = SAMPLE_KEYSTORE_PASSWORD
 
             payload = {
                 "keystores": [json.dumps(keystore_data)],
-                "passwords": [password],
+                "passwords": [ks_password],
             }
 
             async with session.post(
@@ -544,7 +546,7 @@ async def main() -> int:
         print()
 
         # Determine which pubkey to use
-        pubkey = args.pubkey
+        pubkey: str | None = args.pubkey
 
         if pubkey is None:
             # Check if server already has keys loaded
@@ -601,8 +603,8 @@ async def main() -> int:
     )
 
     # Store metadata for display
-    result._url = args.url  # type: ignore[attr-defined]
-    result._concurrency = args.concurrency  # type: ignore[attr-defined]
+    result._url = args.url
+    result._concurrency = args.concurrency
 
     # Print results
     print(result)
