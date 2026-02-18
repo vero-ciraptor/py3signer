@@ -16,6 +16,10 @@ from .metrics_server import MetricsServer
 
 logger = logging.getLogger(__name__)
 
+# Typed app keys to avoid NotAppKeyWarning
+APP_KEY_STORAGE: web.AppKey[KeyStorage] = web.AppKey("storage", KeyStorage)
+APP_KEY_SIGNER: web.AppKey[Signer] = web.AppKey("signer", Signer)
+
 
 def create_app(config: Config) -> web.Application:
     """Create and configure the aiohttp application."""
@@ -27,9 +31,9 @@ def create_app(config: Config) -> web.Application:
     # Create app
     app = web.Application()
     
-    # Store components in app for access
-    app["storage"] = storage
-    app["signer"] = signer
+    # Store components in app for access using typed AppKey
+    app[APP_KEY_STORAGE] = storage
+    app[APP_KEY_SIGNER] = signer
     
     # Setup routes
     setup_routes(app, handler)
