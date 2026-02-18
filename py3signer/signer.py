@@ -58,12 +58,7 @@ class Signer:
         Raises:
             SignerError: If key not found or signing fails
         """
-        # Get the secret key
-        secret_key = self._storage.get_secret_key(pubkey_hex)
-        if secret_key is None:
-            raise SignerError(f"Key not found: {pubkey_hex}")
-        
-        # Determine domain
+        # Validate domain first (before key lookup)
         if domain is None:
             if domain_name is None:
                 raise SignerError("Either domain or domain_name must be provided")
@@ -73,6 +68,11 @@ class Signer:
         
         if len(domain) != 4:
             raise SignerError(f"Domain must be 4 bytes, got {len(domain)}")
+        
+        # Get the secret key
+        secret_key = self._storage.get_secret_key(pubkey_hex)
+        if secret_key is None:
+            raise SignerError(f"Key not found: {pubkey_hex}")
         
         try:
             signature = sign(secret_key, data, domain)
