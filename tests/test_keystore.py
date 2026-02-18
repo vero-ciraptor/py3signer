@@ -136,19 +136,13 @@ class TestKeystoreDecryption:
         # And derive to the same public key
         assert sk_scrypt.public_key().to_bytes() == sk_pbkdf2.public_key().to_bytes()
     
-    def test_decrypt_wrong_password_scrypt(self) -> None:
-        """Test scrypt decryption with wrong password."""
-        keystore_path = Path(__file__).parent / "data" / "test_keystore_scrypt.json"
-        ks = Keystore.from_file(keystore_path)
-        
-        with pytest.raises(KeystoreError) as exc_info:
-            ks.decrypt("wrongpassword")
-        error_msg = str(exc_info.value).lower()
-        assert "password" in error_msg or "invalid" in error_msg
-    
-    def test_decrypt_wrong_password_pbkdf2(self) -> None:
-        """Test PBKDF2 decryption with wrong password."""
-        keystore_path = Path(__file__).parent / "data" / "test_keystore_pbkdf2.json"
+    @pytest.mark.parametrize("keystore_file", [
+        "test_keystore_scrypt.json",
+        "test_keystore_pbkdf2.json",
+    ], ids=["scrypt", "pbkdf2"])
+    def test_decrypt_wrong_password(self, keystore_file: str) -> None:
+        """Test decryption with wrong password for different KDF types."""
+        keystore_path = Path(__file__).parent / "data" / keystore_file
         ks = Keystore.from_file(keystore_path)
         
         with pytest.raises(KeystoreError) as exc_info:

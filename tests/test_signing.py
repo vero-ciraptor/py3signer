@@ -128,21 +128,18 @@ class TestSigner:
             signer.sign_data("nonexistent", b"data", domain_name="beacon_attester")
         assert "not found" in str(exc_info.value).lower()
     
-    def test_sign_data_no_domain(self, storage: KeyStorage) -> None:
-        """Test signing without domain."""
+    @pytest.mark.parametrize("domain_name,domain_bytes,expected_error", [
+        (None, None, "domain"),  # No domain provided
+        ("unknown_domain", None, "unknown"),  # Unknown domain name
+        (None, b"\x00\x00", "4 bytes"),  # Invalid domain length (2 bytes)
+    ], ids=["no_domain", "unknown_domain", "invalid_domain_length"])
+    def test_sign_data_domain_validation(self, storage: KeyStorage, domain_name, domain_bytes, expected_error) -> None:
+        """Test domain validation errors."""
         signer = Signer(storage)
         
         with pytest.raises(SignerError) as exc_info:
-            signer.sign_data("any", b"data")
-        assert "domain" in str(exc_info.value).lower()
-    
-    def test_sign_data_unknown_domain(self, storage: KeyStorage) -> None:
-        """Test signing with unknown domain name."""
-        signer = Signer(storage)
-        
-        with pytest.raises(SignerError) as exc_info:
-            signer.sign_data("any", b"data", domain_name="unknown_domain")
-        assert "unknown" in str(exc_info.value).lower()
+            signer.sign_data("any", b"data", domain_name=domain_name, domain=domain_bytes)
+        assert expected_error in str(exc_info.value).lower()
     
     def test_sign_data_success(self, storage: KeyStorage) -> None:
         """Test successful signing."""
@@ -182,14 +179,6 @@ class TestSigner:
         
         assert signature is not None
         assert len(signature.to_bytes()) == 96
-    
-    def test_sign_with_invalid_domain_length(self, storage: KeyStorage) -> None:
-        """Test signing with invalid domain length."""
-        signer = Signer(storage)
-        
-        with pytest.raises(SignerError) as exc_info:
-            signer.sign_data("any", b"data", domain=b"\x00\x00")  # Only 2 bytes
-        assert "4 bytes" in str(exc_info.value)
 
 
 class TestSignerDomains:
@@ -205,42 +194,17 @@ class TestSignerDomains:
         signer = Signer(storage)
         return signer, pk.to_bytes().hex()
     
-    def test_sign_attestation(self, signer_with_key) -> None:
-        """Test attestation signing."""
+    @pytest.mark.parametrize("domain_method,test_data", [
+        ("sign_attestation", b"\x00" * 32),
+        ("sign_block", b"\x00" * 32),
+        ("sign_randao", b"\x00" * 32),
+        ("sign_voluntary_exit", b"\x00" * 32),
+    ], ids=["attestation", "block", "randao", "voluntary_exit"])
+    def test_sign_with_domain(self, signer_with_key, domain_method, test_data) -> None:
+        """Test signing with different domain methods."""
         signer, pubkey = signer_with_key
         
-        attestation_data = b"\x00" * 32
-        signature = signer.sign_attestation(pubkey, attestation_data)
-        
-        assert signature is not None
-        assert len(signature.to_bytes()) == 96
-    
-    def test_sign_block(self, signer_with_key) -> None:
-        """Test block signing."""
-        signer, pubkey = signer_with_key
-        
-        block_data = b"\x00" * 32
-        signature = signer.sign_block(pubkey, block_data)
-        
-        assert signature is not None
-        assert len(signature.to_bytes()) == 96
-    
-    def test_sign_randao(self, signer_with_key) -> None:
-        """Test RANDAO signing."""
-        signer, pubkey = signer_with_key
-        
-        epoch = b"\x00" * 32
-        signature = signer.sign_randao(pubkey, epoch)
-        
-        assert signature is not None
-        assert len(signature.to_bytes()) == 96
-    
-    def test_sign_voluntary_exit(self, signer_with_key) -> None:
-        """Test voluntary exit signing."""
-        signer, pubkey = signer_with_key
-        
-        exit_data = b"\x00" * 32
-        signature = signer.sign_voluntary_exit(pubkey, exit_data)
+        signature = getattr(signer, domain_method)(pubkey, test_data)
         
         assert signature is not None
         assert len(signature.to_bytes()) == 96
