@@ -12,11 +12,7 @@ from py3signer.storage import KeyStorage
 @pytest.fixture
 def config() -> Config:
     """Create a test configuration."""
-    return Config(
-        host="127.0.0.1",
-        port=8080,
-        log_level="DEBUG"
-    )
+    return Config(host="127.0.0.1", port=8080, log_level="DEBUG")
 
 
 @pytest.fixture
@@ -41,10 +37,11 @@ async def client(config: Config):
 import json
 from pathlib import Path
 
+
 @pytest.fixture
 def sample_keystore() -> dict:
     """Return a sample EIP-2335 keystore for testing.
-    
+
     This is a real, valid keystore that can be decrypted with
     the password from sample_keystore_password fixture.
     Uses scrypt KDF with N=262144.

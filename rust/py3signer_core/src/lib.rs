@@ -29,22 +29,22 @@ impl PySecretKey {
                 format!("SecretKey must be 32 bytes, got {}", bytes.len())
             ));
         }
-        
+
         let key_bytes: [u8; 32] = bytes.try_into()
             .map_err(|_| PyValueError::new_err("Invalid byte length"))?;
-        
+
         let sk = SecretKey::from_bytes(&key_bytes)
             .map_err(|e| PyValueError::new_err(format!("Invalid secret key: {:?}", e)))?;
-        
+
         Ok(PySecretKey { inner: Arc::new(sk) })
     }
-    
+
     /// Serialize to 32 bytes
     fn to_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
         let bytes = self.inner.to_bytes();
         Ok(pyo3::types::PyBytes::new(py, &bytes))
     }
-    
+
     /// Get the corresponding public key
     fn public_key(&self) -> PyResult<PyPublicKey> {
         Ok(PyPublicKey {
@@ -70,13 +70,13 @@ impl PyPublicKey {
                 format!("PublicKey must be 48 bytes, got {}", bytes.len())
             ));
         }
-        
+
         let pk = PublicKey::from_bytes(bytes)
             .map_err(|e| PyValueError::new_err(format!("Invalid public key: {:?}", e)))?;
-        
+
         Ok(PyPublicKey { inner: pk })
     }
-    
+
     /// Serialize to 48 bytes (compressed G1 point)
     fn to_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
         // For min_sig, public keys are G1 points: 48 bytes compressed
@@ -102,13 +102,13 @@ impl PySignature {
                 format!("Signature must be 96 bytes, got {}", bytes.len())
             ));
         }
-        
+
         let sig = BlstSignature::from_bytes(bytes)
             .map_err(|e| PyValueError::new_err(format!("Invalid signature: {:?}", e)))?;
-        
+
         Ok(PySignature { inner: sig })
     }
-    
+
     /// Serialize to 96 bytes (compressed G2 point)
     fn to_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
         // For min_sig, signatures are G2 points: 96 bytes compressed
@@ -121,23 +121,23 @@ impl PySignature {
 #[pyfunction]
 fn sign(secret_key: &PySecretKey, message: &[u8], domain: &[u8]) -> PyResult<PySignature> {
     let hash = hash_to_g2(message, domain);
-    
+
     // blst::min_sig::SecretKey::sign returns Signature directly (not Result)
     let signature = secret_key.inner.sign(&hash, b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_", &[]);
-    
+
     Ok(PySignature { inner: signature })
 }
 
 /// Verify a signature
 #[pyfunction]
 fn verify(
-    public_key: &PyPublicKey, 
-    message: &[u8], 
-    signature: &PySignature, 
+    public_key: &PyPublicKey,
+    message: &[u8],
+    signature: &PySignature,
     domain: &[u8]
 ) -> PyResult<bool> {
     let hash = hash_to_g2(message, domain);
-    
+
     // Correct API for min_pk: verify(sig_groupcheck, msg, dst, aug, pk, pk_validate)
     let result = signature.inner.verify(
         true,  // sig_groupcheck
@@ -147,7 +147,7 @@ fn verify(
         &public_key.inner, // pk
         true,  // pk_validate
     );
-    
+
     match result {
         blst::BLST_ERROR::BLST_SUCCESS => Ok(true),
         _ => Ok(false),
@@ -159,23 +159,23 @@ fn verify(
 #[pyfunction]
 fn generate_random_key(py: Python) -> PyResult<PySecretKey> {
     use pyo3::types::PyBytes;
-    
+
     // Get random bytes from Python's secrets module
     let secrets = py.import("secrets")?;
     let token_bytes = secrets.getattr("token_bytes")?;
-    
+
     // BLS12-381 scalar field order is slightly less than 2^255
     // We'll use rejection sampling: generate random bytes, check if valid
     for _ in 0..100 {  // Limit iterations to prevent infinite loop
         let random_bytes: Bound<PyBytes> = token_bytes.call1((32,))?.extract()?;
         let bytes: &[u8] = random_bytes.as_bytes();
-        
+
         // Try to create a secret key - it will fail if bytes >= curve order
         if let Ok(sk) = SecretKey::from_bytes(bytes.try_into().unwrap()) {
             return Ok(PySecretKey { inner: Arc::new(sk) });
         }
     }
-    
+
     Err(PyRuntimeError::new_err("Failed to generate valid random key after 100 attempts"))
 }
 
@@ -185,9 +185,9 @@ mod keystore {
     use serde::{Deserialize, Serialize};
     use sha3::{Keccak256, Digest as Sha3Digest};
     use aes::cipher::{KeyIvInit, StreamCipher};
-    
+
     type Aes256Ctr = ctr::Ctr128BE<aes::Aes256>;
-    
+
     #[derive(Debug, Serialize, Deserialize)]
     pub struct Keystore {
         pub crypto: Crypto,
@@ -197,21 +197,21 @@ mod keystore {
         pub uuid: String,
         pub version: u32,
     }
-    
+
     #[derive(Debug, Serialize, Deserialize)]
     pub struct Crypto {
         pub kdf: Kdf,
         pub checksum: Checksum,
         pub cipher: Cipher,
     }
-    
+
     #[derive(Debug, Serialize, Deserialize)]
     pub struct Kdf {
         pub function: String,
         pub params: KdfParams,
         pub message: String,
     }
-    
+
     #[derive(Debug, Serialize, Deserialize)]
     #[serde(untagged)]
     pub enum KdfParams {
@@ -229,43 +229,43 @@ mod keystore {
             salt: String,
         },
     }
-    
+
     #[derive(Debug, Serialize, Deserialize)]
     pub struct Checksum {
         pub function: String,
         pub params: serde_json::Value,
         pub message: String,
     }
-    
+
     #[derive(Debug, Serialize, Deserialize)]
     pub struct Cipher {
         pub function: String,
         pub params: CipherParams,
         pub message: String,
     }
-    
+
     #[derive(Debug, Serialize, Deserialize)]
     pub struct CipherParams {
         pub iv: String,
     }
-    
+
     /// Decrypt an EIP-2335 keystore
     pub fn decrypt_keystore(keystore_json: &str, password: &str) -> PyResult<Vec<u8>> {
         let keystore: Keystore = serde_json::from_str(keystore_json)
             .map_err(|e| PyValueError::new_err(format!("Invalid keystore JSON: {}", e)))?;
-        
+
         // Decode salt and ciphertext
         let salt = hex::decode(match &keystore.crypto.kdf.params {
             KdfParams::Scrypt { salt, .. } => salt,
             KdfParams::Pbkdf2 { salt, .. } => salt,
         }).map_err(|e| PyValueError::new_err(format!("Invalid salt: {}", e)))?;
-        
+
         let ciphertext = hex::decode(&keystore.crypto.cipher.message)
             .map_err(|e| PyValueError::new_err(format!("Invalid ciphertext: {}", e)))?;
-        
+
         let iv = hex::decode(&keystore.crypto.cipher.params.iv)
             .map_err(|e| PyValueError::new_err(format!("Invalid IV: {}", e)))?;
-        
+
         // Derive key using specified KDF
         let mut key = vec![0u8; 32];
         match &keystore.crypto.kdf.params {
@@ -277,7 +277,7 @@ mod keystore {
                     *p,
                     *dklen as usize,
                 ).map_err(|e| PyRuntimeError::new_err(format!("Invalid scrypt params: {}", e)))?;
-                
+
                 scrypt::scrypt(password.as_bytes(), &salt, &params, &mut key)
                     .map_err(|e| PyRuntimeError::new_err(format!("Scrypt failed: {}", e)))?;
             }
@@ -293,7 +293,7 @@ mod keystore {
                 }
             }
         }
-        
+
         // Verify checksum
         let mut hasher = Keccak256::new();
         hasher.update(&key[16..32]);
@@ -301,18 +301,18 @@ mod keystore {
         let checksum = hasher.finalize();
         let expected_checksum = hex::decode(&keystore.crypto.checksum.message)
             .map_err(|e| PyValueError::new_err(format!("Invalid checksum hex: {}", e)))?;
-        
+
         if checksum.as_slice() != expected_checksum.as_slice() {
             return Err(PyValueError::new_err("Invalid password - checksum mismatch"));
         }
-        
+
         // Decrypt
         let mut cipher = Aes256Ctr::new_from_slices(&key[0..32], &iv)
             .map_err(|e| PyRuntimeError::new_err(format!("Cipher init failed: {}", e)))?;
-        
+
         let mut plaintext = ciphertext.clone();
         cipher.apply_keystream(&mut plaintext);
-        
+
         Ok(plaintext)
     }
 }
@@ -339,7 +339,7 @@ fn py3signer_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_key_roundtrip() {
         // Generate a test key (32 bytes)
@@ -348,7 +348,7 @@ mod tests {
         // Just test that it doesn't panic
         assert!(sk.public_key().is_ok());
     }
-    
+
     #[test]
     fn test_public_key_from_secret() {
         let key_bytes = [1u8; 32];
@@ -357,12 +357,12 @@ mod tests {
         // Public key should be valid
         let _ = pk.inner.to_bytes();
     }
-    
+
     #[test]
     fn test_invalid_key_length() {
         let key_bytes = [1u8; 31]; // Wrong length
         let result = PySecretKey::from_bytes(&key_bytes);
         assert!(result.is_err());
     }
-    
+
 }

@@ -1,28 +1,83 @@
-# See https://pre-commit.com for more information
-# See https://pre-commit.com/hooks.html for more hooks
+default_language_version:
+    python: python3.12
+
 repos:
+  # All files basic formatter
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v6.0.0
     hooks:
-      - id: trailing-whitespace
-      - id: end-of-file-fixer
-      - id: check-yaml
-      - id: check-added-large-files
-      - id: check-toml
+      - id: check-ast
       - id: check-merge-conflict
+      - id: check-yaml
+        exclude: "docs/mkdocs.yml"
+      - id: end-of-file-fixer
+        exclude: "src/spec/configs/\\w+\\.yaml$"
+      - id: mixed-line-ending
+      - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.0
+    rev: v0.14.14
     hooks:
-      # Run the linter.
-      - id: ruff
-        args: [--fix]
-      # Run the formatter.
       - id: ruff-format
+      - id: ruff-check
+        exclude: "scripts/.*\\.py$"
+        args: [--fix, --exit-non-zero-on-fix]
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.14.0
+    rev: v1.19.1
     hooks:
-      - id: mypy
-        additional_dependencies: [types-aiohttp]
-        args: [--strict]
+    -   id: mypy
+        exclude: "scripts/.*\\.py$"
+        additional_dependencies:
+          [
+          aiohttp==3.13.3,
+          aiosignal==1.4.0,
+          msgspec==0.20.0,
+          prometheus-client==0.24.1,
+          pytest==9.0.2,
+          ]
+
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.14.0
+    hooks:
+      - id: hadolint-docker
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    # uv version.
+    rev: 0.8.24
+    hooks:
+      - id: uv-lock
+      - id: uv-export
+        name: export dependencies -> requirements.txt
+        args: ["--no-dev", "--output-file=requirements.txt"]
+      - id: uv-export
+        name: export dev dependencies -> requirements-dev.txt
+        args: ["--dev", "--output-file=requirements-dev.txt"]
+
+  - repo: https://github.com/bnjbvr/cargo-machete
+    rev: v0.9.1
+    hooks:
+    - id: cargo-machete
+
+  - repo: local
+    hooks:
+    - id: cargo-fmt
+      name: cargo fmt (rust/py3signer_core)
+      language: system
+      entry: cargo fmt --manifest-path rust/py3signer_core/Cargo.toml --all --check
+      pass_filenames: false
+      files: ^rust/py3signer_core/
+
+    - id: cargo-check
+      name: cargo check (rust/py3signer_core)
+      language: system
+      entry: cargo check --manifest-path rust/py3signer_core/Cargo.toml
+      pass_filenames: false
+      files: ^rust/py3signer_core/
+
+    - id: cargo-clippy
+      name: cargo clippy (rust/py3signer_core)
+      language: system
+      entry: cargo clippy --manifest-path rust/py3signer_core/Cargo.toml --all-targets --all-features -- -D warnings -W clippy::pedantic
+      pass_filenames: false
+      files: ^rust/py3signer_core/

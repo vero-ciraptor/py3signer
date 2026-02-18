@@ -600,14 +600,6 @@ dependencies = [
     { name = "pycryptodome" },
 ]
 
-[package.optional-dependencies]
-dev = [
-    { name = "maturin" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-]
-
 [package.dev-dependencies]
 dev = [
     { name = "maturin" },
@@ -619,15 +611,10 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.11.0" },
-    { name = "maturin", marker = "extra == 'dev'", specifier = ">=1.8.0" },
     { name = "msgspec", specifier = ">=0.19.0" },
     { name = "prometheus-client", specifier = ">=0.21.0" },
     { name = "pycryptodome", specifier = ">=3.23.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.25.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.0.0" },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
 dev = [

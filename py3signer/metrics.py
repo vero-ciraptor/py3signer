@@ -4,7 +4,15 @@ This module defines and exposes all Prometheus metrics used by py3signer.
 Metrics are opt-in and only collected when --metrics-enabled is set.
 """
 
-from prometheus_client import Counter, Histogram, Gauge, Info, CollectorRegistry, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Gauge,
+    Histogram,
+    Info,
+    generate_latest,
+)
 
 # Create a dedicated registry for py3signer metrics
 REGISTRY = CollectorRegistry()
@@ -15,10 +23,12 @@ APP_INFO = Info(
     "Build information about py3signer",
     registry=REGISTRY,
 )
-APP_INFO.info({
-    "version": "0.1.0",
-    "name": "py3signer",
-})
+APP_INFO.info(
+    {
+        "version": "0.1.0",
+        "name": "py3signer",
+    }
+)
 
 # Signing metrics
 SIGNING_REQUESTS_TOTAL = Counter(

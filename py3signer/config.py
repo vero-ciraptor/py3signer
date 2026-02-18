@@ -64,59 +64,33 @@ def get_config() -> Config:
     """Parse command line arguments and return configuration."""
     parser = argparse.ArgumentParser(
         description="py3signer - A Remote BLS Signer for Ethereum",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
+    parser.add_argument("--host", default="127.0.0.1", help="HTTP server host (default: 127.0.0.1)")
     parser.add_argument(
-        "--host",
-        default="127.0.0.1",
-        help="HTTP server host (default: 127.0.0.1)"
+        "-p", "--port", type=int, default=8080, help="HTTP server port (default: 8080)"
     )
-    parser.add_argument(
-        "-p", "--port",
-        type=int,
-        default=8080,
-        help="HTTP server port (default: 8080)"
-    )
-    parser.add_argument(
-        "--tls-cert",
-        type=Path,
-        default=None,
-        help="Path to TLS certificate file"
-    )
-    parser.add_argument(
-        "--tls-key",
-        type=Path,
-        default=None,
-        help="Path to TLS private key file"
-    )
+    parser.add_argument("--tls-cert", type=Path, default=None, help="Path to TLS certificate file")
+    parser.add_argument("--tls-key", type=Path, default=None, help="Path to TLS private key file")
     parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="INFO",
-        help="Logging level (default: INFO)"
+        help="Logging level (default: INFO)",
     )
-    parser.add_argument(
-        "--auth-token",
-        default=None,
-        help="Bearer token for API authentication"
-    )
+    parser.add_argument("--auth-token", default=None, help="Bearer token for API authentication")
     parser.add_argument(
         "--metrics-enabled",
         action="store_true",
         default=False,
-        help="Enable Prometheus metrics endpoint (default: false)"
+        help="Enable Prometheus metrics endpoint (default: false)",
     )
     parser.add_argument(
-        "--metrics-port",
-        type=int,
-        default=8081,
-        help="Port for metrics server (default: 8081)"
+        "--metrics-port", type=int, default=8081, help="Port for metrics server (default: 8081)"
     )
     parser.add_argument(
-        "--metrics-host",
-        default="127.0.0.1",
-        help="Host for metrics server (default: 127.0.0.1)"
+        "--metrics-host", default="127.0.0.1", help="Host for metrics server (default: 127.0.0.1)"
     )
 
     args = parser.parse_args()
