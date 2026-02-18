@@ -2,6 +2,7 @@
 
 import json
 import logging
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,34 @@ import msgspec
 from py3signer_core import SecretKey, decrypt_keystore
 
 logger = logging.getLogger(__name__)
+
+
+def normalize_password(password: str) -> str:
+    """Normalize password according to EIP-2335 specification.
+
+    The password is first converted to its NFKD representation, then the control
+    codes are stripped (C0: 0x00-0x1F, C1: 0x80-0x9F, DEL: 0x7F), and finally
+    it is UTF-8 encoded.
+
+    Args:
+        password: Raw password string
+
+    Returns:
+        Normalized password string
+    """
+    # NFKD normalization
+    normalized = unicodedata.normalize("NFKD", password)
+
+    # Strip control codes: C0 (0x00-0x1F), C1 (0x80-0x9F), DEL (0x7F)
+    result = []
+    for char in normalized:
+        code = ord(char)
+        # Skip C0 control codes (0x00-0x1F), C1 control codes (0x80-0x9F), and DEL (0x7F)
+        if code <= 0x1F or (0x7F <= code <= 0x9F):
+            continue
+        result.append(char)
+
+    return "".join(result)
 
 
 class KeystoreError(Exception):
@@ -73,10 +102,13 @@ class Keystore(msgspec.Struct):
     def decrypt(self, password: str) -> SecretKey:
         """Decrypt the keystore and return the secret key."""
         try:
+            # Apply EIP-2335 password normalization
+            normalized_password = normalize_password(password)
+
             # Convert struct to dict for the decrypt_keystore function
             data = msgspec.to_builtins(self)
             json_str = json.dumps(data)
-            secret_bytes = decrypt_keystore(json_str, password)
+            secret_bytes = decrypt_keystore(json_str, normalized_password)
 
             # Convert list to bytes if necessary (Rust returns Vec<u8> as list)
             if isinstance(secret_bytes, list):

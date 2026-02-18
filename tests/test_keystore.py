@@ -178,8 +178,11 @@ class TestKeystoreDecryptionV4:
         secret_key = keystore.decrypt(password)
         assert secret_key is not None
 
-        # Verify the public key matches
+        # Verify the public key matches (now correctly using aes-128-ctr)
         pubkey = secret_key.public_key()
         pubkey_hex = pubkey.to_bytes().hex()
-        expected_pubkey = "a7515c6ae1bc0448be300a97f84d27c870b67d3d10a2bd3d01b5be4fb5c6023c50452e69d3c09709cfe65b446adc1b0a"
+        expected_pubkey = (
+            "a17d35fec5b2ca5b2e3a95a2c6522014fe4f2a8bc43ce6eba0943ae88c226626"
+            "40df150206e5d2349428746066b20240"
+        )
         assert pubkey_hex == expected_pubkey

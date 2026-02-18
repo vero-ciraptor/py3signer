@@ -220,6 +220,7 @@ mod keystore {
     use serde::{Deserialize, Serialize};
     use sha2::{Digest, Sha256};
 
+    type Aes128Ctr = ctr::Ctr128BE<aes::Aes128>;
     type Aes256Ctr = ctr::Ctr128BE<aes::Aes256>;
 
     #[derive(Debug, Serialize, Deserialize)]
@@ -345,12 +346,30 @@ mod keystore {
             ));
         }
 
-        // Decrypt
-        let mut cipher = Aes256Ctr::new_from_slices(&key[0..32], &iv)
-            .map_err(|e| PyRuntimeError::new_err(format!("Cipher init failed: {e}")))?;
-
+        // Decrypt based on cipher function
+        let cipher_function = keystore.crypto.cipher.function.as_str();
         let mut plaintext = ciphertext.clone();
-        cipher.apply_keystream(&mut plaintext);
+
+        match cipher_function {
+            "aes-128-ctr" => {
+                // EIP-2335 specifies aes-128-ctr: use first 16 bytes of decryption key
+                let mut cipher = Aes128Ctr::new_from_slices(&key[0..16], &iv)
+                    .map_err(|e| PyRuntimeError::new_err(format!("Cipher init failed: {e}")))?;
+                cipher.apply_keystream(&mut plaintext);
+            }
+            "aes-256-ctr" => {
+                // Extended cipher: use full 32 bytes of decryption key
+                let mut cipher = Aes256Ctr::new_from_slices(&key[0..32], &iv)
+                    .map_err(|e| PyRuntimeError::new_err(format!("Cipher init failed: {e}")))?;
+                cipher.apply_keystream(&mut plaintext);
+            }
+            _ => {
+                return Err(PyValueError::new_err(format!(
+                    "Unsupported cipher function: {}. Only aes-128-ctr and aes-256-ctr are supported.",
+                    cipher_function
+                )));
+            }
+        }
 
         Ok(plaintext)
     }
