@@ -416,7 +416,7 @@ async def test_sign_key_not_found(
 async def test_sign_missing_signing_root(
     client: TestClient[Any, Any], valid_fork_info: dict[str, Any]
 ) -> None:
-    """Test signing without signingRoot (required until SSZ computation is implemented)."""
+    """Test signing without signingRoot - returns error since SSZ computation is not implemented."""
     pubkey = "a" * 96
     resp = await client.post(
         f"/api/v1/eth2/sign/{pubkey}",

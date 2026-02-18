@@ -92,11 +92,14 @@ class DepositData(msgspec.Struct, frozen=True):
 
 
 class SyncCommitteeMessageData(msgspec.Struct, frozen=True):
-    """Sync committee message data for SYNC_COMMITTEE_MESSAGE signing type."""
+    """Sync committee message data for SYNC_COMMITTEE_MESSAGE signing type.
+
+    Per Ethereum Remote Signing API spec v1.3.0, SyncCommitteeMessage
+    only contains slot and beacon_block_root.
+    """
 
     slot: str
     beacon_block_root: str = msgspec.field(name="beacon_block_root")
-    validator_index: str = msgspec.field(name="validator_index")
 
 
 class SyncAggregatorSelectionData(msgspec.Struct, frozen=True):

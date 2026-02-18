@@ -345,7 +345,7 @@ class TestGetDomainForRequest:
             ),
             signing_root="0x" + "00" * 32,
             sync_committee_message=SyncCommitteeMessageData(
-                slot="100", beacon_block_root="0x0", validator_index="5"
+                slot="100", beacon_block_root="0x0"
             ),
         )
         assert get_domain_for_request(request) == DOMAIN_SYNC_COMMITTEE
@@ -478,7 +478,6 @@ class TestAllSigningTypes:
                 "sync_committee_message": {
                     "slot": "1",
                     "beacon_block_root": "0x0",
-                    "validator_index": "0",
                 }
             },
             "SYNC_COMMITTEE_SELECTION_PROOF": {
