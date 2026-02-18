@@ -6,11 +6,11 @@
 FROM python:3.12-slim-bookworm AS builder
 
 # Install Rust toolchain and build dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    build-essential \
-    pkg-config \
-    libssl-dev \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl=7.88.* \
+    build-essential=12.* \
+    pkg-config=1.8.* \
+    libssl-dev=3.0.* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust
@@ -41,9 +41,9 @@ RUN uv run maturin build --release -o dist
 FROM python:3.12-slim-bookworm
 
 # Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    libssl3 \
-    ca-certificates \
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libssl3=3.0.* \
+    ca-certificates=2023* \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
@@ -63,7 +63,7 @@ COPY --from=builder /build/dist/*.whl /tmp/
 
 # Create virtual environment and install dependencies
 RUN uv venv
-RUN uv pip install /tmp/*.whl aiohttp>=3.11.0 msgspec>=0.19.0
+RUN uv pip install "/tmp/*.whl" "aiohttp>=3.11.0" "msgspec>=0.19.0"
 
 # Clean up
 RUN rm /tmp/*.whl

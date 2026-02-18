@@ -324,9 +324,10 @@ mod keystore {
 
         // Verify checksum - only version 4 (EIP-2335) is supported
         if keystore.version != 4 {
-            return Err(PyValueError::new_err(
-                format!("Keystore version {} is not supported, only version 4 (EIP-2335) is supported", keystore.version)
-            ));
+            return Err(PyValueError::new_err(format!(
+                "Keystore version {} is not supported, only version 4 (EIP-2335) is supported",
+                keystore.version
+            )));
         }
 
         let expected_checksum = hex::decode(&keystore.crypto.checksum.message)
