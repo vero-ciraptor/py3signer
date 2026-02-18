@@ -162,7 +162,7 @@ class AggregationSlotSignRequest(
 
     aggregation_slot: AggregationSlot
     fork_info: ForkInfo = msgspec.field(name="fork_info")
-    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
+    signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
 class AggregateAndProofSignRequest(
@@ -172,7 +172,7 @@ class AggregateAndProofSignRequest(
 
     aggregate_and_proof: AggregateAndProof
     fork_info: ForkInfo = msgspec.field(name="fork_info")
-    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
+    signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
 class AggregateAndProofV2SignRequest(
@@ -182,7 +182,7 @@ class AggregateAndProofV2SignRequest(
 
     aggregate_and_proof: dict[str, Any]  # Versioned aggregate_and_proof
     fork_info: ForkInfo = msgspec.field(name="fork_info")
-    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
+    signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
 class AttestationSignRequest(
@@ -192,7 +192,7 @@ class AttestationSignRequest(
 
     attestation: AttestationData
     fork_info: ForkInfo = msgspec.field(name="fork_info")
-    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
+    signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
 class BlockSignRequest(msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag="BLOCK"):
@@ -200,7 +200,7 @@ class BlockSignRequest(msgspec.Struct, kw_only=True, frozen=True, tag_field="typ
 
     block: dict[str, Any]  # BeaconBlock
     fork_info: ForkInfo = msgspec.field(name="fork_info")
-    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
+    signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
 class BlockV2SignRequest(
@@ -210,7 +210,7 @@ class BlockV2SignRequest(
 
     beacon_block: dict[str, Any] = msgspec.field(name="beacon_block")  # Versioned block
     fork_info: ForkInfo = msgspec.field(name="fork_info")
-    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
+    signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
 class DepositSignRequest(
@@ -220,7 +220,7 @@ class DepositSignRequest(
 
     deposit: DepositData
     fork_info: ForkInfo = msgspec.field(name="fork_info")
-    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
+    signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
 class RandaoRevealSignRequest(
@@ -230,7 +230,7 @@ class RandaoRevealSignRequest(
 
     randao_reveal: RandaoReveal
     fork_info: ForkInfo = msgspec.field(name="fork_info")
-    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
+    signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
 class VoluntaryExitSignRequest(
@@ -240,7 +240,7 @@ class VoluntaryExitSignRequest(
 
     voluntary_exit: VoluntaryExit
     fork_info: ForkInfo = msgspec.field(name="fork_info")
-    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
+    signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
 class SyncCommitteeMessageSignRequest(
@@ -250,7 +250,7 @@ class SyncCommitteeMessageSignRequest(
 
     sync_committee_message: SyncCommitteeMessageData
     fork_info: ForkInfo = msgspec.field(name="fork_info")
-    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
+    signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
 class SyncCommitteeSelectionProofSignRequest(
@@ -264,7 +264,7 @@ class SyncCommitteeSelectionProofSignRequest(
 
     sync_aggregator_selection_data: SyncAggregatorSelectionData
     fork_info: ForkInfo = msgspec.field(name="fork_info")
-    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
+    signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
 class SyncCommitteeContributionAndProofSignRequest(
@@ -278,7 +278,7 @@ class SyncCommitteeContributionAndProofSignRequest(
 
     contribution_and_proof: ContributionAndProof
     fork_info: ForkInfo = msgspec.field(name="fork_info")
-    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
+    signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
 class ValidatorRegistrationSignRequest(
@@ -288,7 +288,7 @@ class ValidatorRegistrationSignRequest(
 
     validator_registration: ValidatorRegistration
     fork_info: ForkInfo = msgspec.field(name="fork_info")
-    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
+    signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
 # The union type for all sign requests
