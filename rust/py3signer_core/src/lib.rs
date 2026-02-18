@@ -322,15 +322,29 @@ mod keystore {
             }
         }
 
-        // Verify checksum
-        let mut hasher = Keccak256::new();
-        hasher.update(&key[16..32]);
-        hasher.update(&ciphertext);
-        let checksum = hasher.finalize();
+        // Verify checksum (version-dependent)
         let expected_checksum = hex::decode(&keystore.crypto.checksum.message)
             .map_err(|e| PyValueError::new_err(format!("Invalid checksum hex: {e}")))?;
 
-        if checksum.as_slice() != expected_checksum.as_slice() {
+        let checksum_valid = match keystore.version {
+            4 => {
+                // Version 4 uses SHA-256 for checksum
+                use sha2::{Digest, Sha256};
+                let mut hasher = Sha256::new();
+                hasher.update(&key[16..32]);
+                hasher.update(&ciphertext);
+                hasher.finalize().as_slice() == expected_checksum.as_slice()
+            }
+            _ => {
+                // Version 3 uses Keccak-256 for checksum
+                let mut hasher = Keccak256::new();
+                hasher.update(&key[16..32]);
+                hasher.update(&ciphertext);
+                hasher.finalize().as_slice() == expected_checksum.as_slice()
+            }
+        };
+
+        if !checksum_valid {
             return Err(PyValueError::new_err(
                 "Invalid password - checksum mismatch",
             ));

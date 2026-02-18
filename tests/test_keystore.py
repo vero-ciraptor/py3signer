@@ -160,3 +160,26 @@ class TestKeystoreDecryptionLegacy:
             ks.decrypt("wrongpassword")
         error_msg = str(exc_info.value).lower()
         assert "password" in error_msg or "invalid" in error_msg
+
+
+class TestKeystoreDecryptionV4:
+    """Tests for version 4 keystore decryption (EIP-2335)."""
+
+    def test_decrypt_v4_pbkdf2_keystore(self) -> None:
+        """Test decrypting a version 4 PBKDF2 keystore with SHA-256 checksum."""
+        # The failing_keystore is a v4 keystore that uses SHA-256 for checksum
+        keystore_path = Path(__file__).parent / "data" / "failing_keystore.json"
+        password_path = Path(__file__).parent / "data" / "failing_keystore.txt"
+
+        keystore = Keystore.from_file(keystore_path)
+        password = password_path.read_text().strip()
+
+        # Should decrypt successfully
+        secret_key = keystore.decrypt(password)
+        assert secret_key is not None
+
+        # Verify the public key matches
+        pubkey = secret_key.public_key()
+        pubkey_hex = pubkey.to_bytes().hex()
+        expected_pubkey = "b9e03b94bb696b0e4c7939bce96d9e4fb1938074233d87b290b20cf66d3e48a7f3d852d89969f45c075e3dca91945832"
+        assert pubkey_hex == expected_pubkey
