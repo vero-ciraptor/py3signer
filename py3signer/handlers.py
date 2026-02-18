@@ -270,8 +270,28 @@ class APIHandler:
             "message": "Remote keys not supported"
         }, status=501)
     
+    async def list_public_keys(self, request: web.Request) -> web.Response:
+        """GET /api/v1/eth2/publicKeys - List available BLS public keys.
+
+        Returns a JSON array of hex-encoded BLS public keys, as specified
+        by the Ethereum Remote Signing API.
+        """
+        await self._require_auth(request)
+
+        keys = self._storage.list_keys()
+        public_keys = [f"0x{pubkey}" for pubkey, _, _ in keys]
+
+        return web.json_response(public_keys)
+
     async def sign(self, request: web.Request) -> web.Response:
-        """POST /api/v1/eth2/sign/:identifier - Sign data."""
+        """POST /api/v1/eth2/sign/:identifier - Sign data.
+
+        Note: This endpoint uses a simplified request format compared to the
+        full Ethereum Remote Signing API spec. The spec supports typed signing
+        requests with discriminators (e.g., {"type": "ATTESTATION", ...}),
+        but py3signer currently only supports the simplified format with
+        signingRoot and domain/domainName.
+        """
         await self._require_auth(request)
         
         # Get identifier from path
@@ -361,5 +381,6 @@ def setup_routes(app: web.Application, handler: APIHandler) -> None:
     app.router.add_post("/eth/v1/remotekeys", handler.add_remote_keys)
     app.router.add_delete("/eth/v1/remotekeys", handler.delete_remote_keys)
     
-    # Signing endpoint
+    # Remote Signing API
+    app.router.add_get("/api/v1/eth2/publicKeys", handler.list_public_keys)
     app.router.add_post("/api/v1/eth2/sign/{identifier}", handler.sign)

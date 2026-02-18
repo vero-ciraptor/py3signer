@@ -196,6 +196,77 @@ async def test_remote_keys_stub(client):
 
 
 @pytest.mark.asyncio
+async def test_list_public_keys_empty(client):
+    """Test listing public keys when none are loaded."""
+    resp = await client.get("/api/v1/eth2/publicKeys")
+    assert resp.status == 200
+
+    data = await resp.json()
+    assert data == []
+
+
+@pytest.mark.asyncio
+async def test_list_public_keys_after_import(client, sample_keystore, sample_keystore_password):
+    """Test listing public keys after importing keystores."""
+    # First import a keystore
+    keystore_json = json.dumps(sample_keystore)
+    await client.post(
+        "/eth/v1/keystores",
+        json={
+            "keystores": [keystore_json],
+            "passwords": [sample_keystore_password]
+        }
+    )
+
+    # Then list public keys via Remote Signing API
+    resp = await client.get("/api/v1/eth2/publicKeys")
+    assert resp.status == 200
+
+    data = await resp.json()
+    assert len(data) == 1
+    # API returns pubkey with "0x" prefix
+    expected_pubkey = sample_keystore["pubkey"]
+    if not expected_pubkey.startswith("0x"):
+        expected_pubkey = "0x" + expected_pubkey
+    assert data[0] == expected_pubkey
+
+
+@pytest.mark.asyncio
+async def test_list_public_keys_auth_required(client, sample_keystore, sample_keystore_password):
+    """Test that publicKeys endpoint requires auth when configured."""
+    from py3signer.config import Config
+    from py3signer.server import create_app
+    from aiohttp.test_utils import TestClient, TestServer
+
+    config = Config(
+        host="127.0.0.1",
+        port=8080,
+        auth_token="secret_token"
+    )
+
+    app = create_app(config)
+    server = TestServer(app)
+    client = TestClient(server)
+    await client.start_server()
+
+    try:
+        # Request without auth should fail
+        resp = await client.get("/api/v1/eth2/publicKeys")
+        assert resp.status == 401
+
+        # Request with correct auth should succeed
+        resp = await client.get(
+            "/api/v1/eth2/publicKeys",
+            headers={"Authorization": "Bearer secret_token"}
+        )
+        assert resp.status == 200
+        data = await resp.json()
+        assert data == []
+    finally:
+        await client.close()
+
+
+@pytest.mark.asyncio
 async def test_sign_missing_identifier(client):
     """Test signing without identifier."""
     resp = await client.post("/api/v1/eth2/sign/", json={})
