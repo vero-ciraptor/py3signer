@@ -224,7 +224,7 @@ async def test_sign_key_not_found(client):
         f"/api/v1/eth2/sign/{pubkey}",
         json={
             "signingRoot": "abcd1234" * 8,  # 64 hex chars = 32 bytes
-            "domain_name": "beacon_attester"
+            "domainName": "beacon_attester"
         }
     )
     assert resp.status == 404
@@ -301,7 +301,7 @@ async def test_full_flow(client, sample_keystore, sample_keystore_password):
         f"/api/v1/eth2/sign/{pubkey}",
         json={
             "signingRoot": signing_root,
-            "domain_name": "beacon_attester"
+            "domainName": "beacon_attester"
         }
     )
     assert resp.status == 200
