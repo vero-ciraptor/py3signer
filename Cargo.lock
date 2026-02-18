@@ -240,7 +240,6 @@ dependencies = [
  "ctr",
  "hex",
  "hex-literal",
- "hmac",
  "pbkdf2",
  "pyo3",
  "scrypt",
