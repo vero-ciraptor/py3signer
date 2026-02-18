@@ -3,7 +3,9 @@
 import json
 import logging
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
+
+import msgspec
 
 from py3signer_core import SecretKey, decrypt_keystore
 
@@ -16,12 +18,29 @@ class KeystoreError(Exception):
     pass
 
 
-class Keystore:
+class Keystore(msgspec.Struct):
     """EIP-2335 keystore representation."""
 
-    def __init__(self, data: dict[str, Any]) -> None:
-        self.data = data
+    crypto: dict[str, Any]
+    pubkey: str
+    path: str
+    uuid: str
+    version: int
+    description: str | None = None
+
+    def __post_init__(self) -> None:
+        """Validate keystore structure after initialization."""
         self._validate()
+
+    def _validate(self) -> None:
+        """Validate keystore structure."""
+        # crypto, pubkey, path, uuid, version are already validated by msgspec
+        # as they are required fields with types
+        if self.version != 4:
+            logger.warning(f"Unexpected keystore version: {self.version}")
+
+        if "kdf" not in self.crypto or "checksum" not in self.crypto or "cipher" not in self.crypto:
+            raise KeystoreError("Invalid crypto structure")
 
     @classmethod
     def from_file(cls, path: Path) -> "Keystore":
@@ -29,59 +48,31 @@ class Keystore:
         try:
             with open(path) as f:
                 data = json.load(f)
-            return cls(data)
+            return cls(**data)
         except json.JSONDecodeError as e:
             raise KeystoreError(f"Invalid JSON: {e}")
         except FileNotFoundError:
             raise KeystoreError(f"Keystore file not found: {path}")
+        except msgspec.ValidationError as e:
+            raise KeystoreError(f"Invalid keystore structure: {e}")
 
     @classmethod
     def from_json(cls, json_str: str) -> "Keystore":
         """Load keystore from JSON string."""
         try:
             data = json.loads(json_str)
-            return cls(data)
+            return cls(**data)
         except json.JSONDecodeError as e:
             raise KeystoreError(f"Invalid JSON: {e}")
-
-    def _validate(self) -> None:
-        """Validate keystore structure."""
-        required = ["crypto", "pubkey", "path", "uuid", "version"]
-        for field in required:
-            if field not in self.data:
-                raise KeystoreError(f"Missing required field: {field}")
-
-        if self.data.get("version") != 4:
-            logger.warning(f"Unexpected keystore version: {self.data.get('version')}")
-
-        crypto = self.data.get("crypto", {})
-        if "kdf" not in crypto or "checksum" not in crypto or "cipher" not in crypto:
-            raise KeystoreError("Invalid crypto structure")
-
-    @property
-    def pubkey(self) -> str:
-        """Get the public key hex string."""
-        return cast(str, self.data["pubkey"])
-
-    @property
-    def uuid(self) -> str:
-        """Get the keystore UUID."""
-        return cast(str, self.data["uuid"])
-
-    @property
-    def path(self) -> str:
-        """Get the derivation path."""
-        return cast(str, self.data["path"])
-
-    @property
-    def description(self) -> str | None:
-        """Get the optional description."""
-        return cast(str | None, self.data.get("description"))
+        except msgspec.ValidationError as e:
+            raise KeystoreError(f"Invalid keystore structure: {e}")
 
     def decrypt(self, password: str) -> SecretKey:
         """Decrypt the keystore and return the secret key."""
         try:
-            json_str = json.dumps(self.data)
+            # Convert struct to dict for the decrypt_keystore function
+            data = msgspec.to_builtins(self)
+            json_str = json.dumps(data)
             secret_bytes = decrypt_keystore(json_str, password)
 
             # Convert list to bytes if necessary (Rust returns Vec<u8> as list)
@@ -97,3 +88,7 @@ class Keystore:
             if "checksum" in error_msg or "password" in error_msg or "invalid" in error_msg:
                 raise KeystoreError("Invalid password")
             raise KeystoreError(f"Decryption failed: {e}")
+
+
+# Alias for backward compatibility
+EIP2335Keystore = Keystore

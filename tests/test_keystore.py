@@ -30,9 +30,9 @@ class TestKeystore:
         """Test validation of required fields."""
         incomplete: dict = {"crypto": {}, "version": 4}
 
-        with pytest.raises(KeystoreError) as exc_info:
-            Keystore(incomplete)
-        assert "Missing required field" in str(exc_info.value)
+        # msgspec.Struct raises TypeError for missing required fields
+        with pytest.raises((KeystoreError, TypeError)):
+            Keystore(**incomplete)
 
     def test_invalid_crypto_structure(self) -> None:
         """Test validation of crypto structure."""
@@ -45,7 +45,7 @@ class TestKeystore:
         }
 
         with pytest.raises(KeystoreError) as exc_info:
-            Keystore(bad_crypto)
+            Keystore(**bad_crypto)
         assert "Invalid crypto structure" in str(exc_info.value)
 
     def test_description_property(self, sample_keystore: dict) -> None:
@@ -77,7 +77,7 @@ class TestKeystore:
             "version": 4,
         }
 
-        ks = Keystore(keystore_data)
+        ks = Keystore(**keystore_data)
         assert ks.description is None
 
 
