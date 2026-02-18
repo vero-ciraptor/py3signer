@@ -1,9 +1,9 @@
-
 #!/usr/bin/env python3
 """aiohttp server setup with profiling support."""
 
 import sys
 from pathlib import Path
+
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -104,20 +104,20 @@ async def run_server(config: Config) -> None:
 if __name__ == "__main__":
     from py3signer.config import Config
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Run py3signer with profiling")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
     parser.add_argument("--port", type=int, default=8080, help="Port to bind to")
     parser.add_argument("--keystore-path", help="Path to keystores")
-    
+
     args = parser.parse_args()
-    
+
     config = Config(
         host=args.host,
         port=args.port,
         key_store_path=args.keystore_path,
     )
-    
+
     try:
         asyncio.run(run_server(config))
     except KeyboardInterrupt:

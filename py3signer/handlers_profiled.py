@@ -1,4 +1,3 @@
-
 """Instrumented HTTP route handlers for profiling."""
 
 import json
@@ -9,7 +8,7 @@ import msgspec
 from aiohttp import web
 
 from .keystore import Keystore, KeystoreError
-from .signer import Signer, SignerError
+from .signer import Signer
 from .signing_types import (
     SignRequest,
     get_domain_for_request,
@@ -23,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 class KeystoreImportRequest(msgspec.Struct):
     """Request struct for importing keystores."""
+
     keystores: list[str]
     passwords: list[str]
 
@@ -35,6 +35,7 @@ class KeystoreImportRequest(msgspec.Struct):
 
 class KeystoreDeleteRequest(msgspec.Struct):
     """Request struct for deleting keystores."""
+
     pubkeys: list[str]
 
     def __post_init__(self) -> None:
@@ -276,7 +277,8 @@ class ProfilingAPIHandler:
         secret_key = self._storage.get_secret_key(pubkey_hex)
         if secret_key is None:
             raise web.HTTPNotFound(
-                text=json.dumps({"error": f"Key not found: {pubkey_hex}"}), content_type="application/json"
+                text=json.dumps({"error": f"Key not found: {pubkey_hex}"}),
+                content_type="application/json",
             )
         profile_times["key_lookup"] = (time.perf_counter() - phase_start) * 1_000_000
 
@@ -285,6 +287,7 @@ class ProfilingAPIHandler:
         try:
             # Import the Rust signing function directly
             from py3signer_core import sign
+
             signature = sign(secret_key, message, domain)
             signature_hex = signature.to_bytes().hex()
         except Exception as e:

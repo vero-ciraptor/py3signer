@@ -162,7 +162,9 @@ def load_input_only_keystores(
         password_file = passwords_path / f"{base_name}.txt"
 
         if not password_file.exists():
-            logger.warning(f"Skipping {json_file.name}: no matching password file in {passwords_path}")
+            logger.warning(
+                f"Skipping {json_file.name}: no matching password file in {passwords_path}"
+            )
             failure_count += 1
             continue
 
@@ -185,7 +187,6 @@ def load_input_only_keystores(
             failure_count += 1
 
     logger.info(
-        f"Input-only keystore loading complete: {success_count} succeeded, "
-        f"{failure_count} failed"
+        f"Input-only keystore loading complete: {success_count} succeeded, {failure_count} failed"
     )
     return success_count, failure_count

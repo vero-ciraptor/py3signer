@@ -136,13 +136,22 @@ class KeyStorage:
             raise ValueError(f"Key already exists: {pubkey_hex}")
 
         self._keys[pubkey_hex] = KeyPair(
-            pubkey=pubkey, secret_key=secret_key, path=path, description=description, persistent=persistent
+            pubkey=pubkey,
+            secret_key=secret_key,
+            path=path,
+            description=description,
+            persistent=persistent,
         )
         KEYS_LOADED.set(len(self._keys))
         logger.info(f"Added key: {pubkey_hex[:20]}...")
 
         persisted_to_disk = False
-        if persistent and self._keystore_path is not None and keystore_json is not None and password is not None:
+        if (
+            persistent
+            and self._keystore_path is not None
+            and keystore_json is not None
+            and password is not None
+        ):
             persisted_to_disk = self._save_to_disk(pubkey_hex, keystore_json, password)
 
         return pubkey_hex, persisted_to_disk

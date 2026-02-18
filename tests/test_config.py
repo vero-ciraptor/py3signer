@@ -23,9 +23,7 @@ class TestKeystoresPathConfig:
         keystores_dir.mkdir()
         passwords_dir.mkdir()
 
-        config = Config(
-            keystores_path=keystores_dir, keystores_passwords_path=passwords_dir
-        )
+        config = Config(keystores_path=keystores_dir, keystores_passwords_path=passwords_dir)
         assert config.keystores_path == keystores_dir
         assert config.keystores_passwords_path == passwords_dir
 

@@ -28,6 +28,7 @@ import aiohttp
 @dataclass
 class PhaseTiming:
     """Timing data for a single request phase."""
+
     name: str
     elapsed_us: float
 
@@ -35,12 +36,13 @@ class PhaseTiming:
 @dataclass
 class RequestProfile:
     """Complete timing profile for a single signing request."""
+
     total_time_us: float = 0.0
     phases: list[PhaseTiming] = field(default_factory=list)
-    
+
     def add_phase(self, name: str, elapsed_us: float) -> None:
         self.phases.append(PhaseTiming(name, elapsed_us))
-    
+
     def get_phase_time(self, name: str) -> float:
         for phase in self.phases:
             if phase.name == name:
@@ -51,19 +53,20 @@ class RequestProfile:
 @dataclass
 class ProfileResults:
     """Aggregated profiling results across all requests."""
+
     total_requests: int = 0
     profiles: list[RequestProfile] = field(default_factory=list)
-    
+
     def add_profile(self, profile: RequestProfile) -> None:
         self.profiles.append(profile)
         self.total_requests += 1
-    
+
     def get_phase_stats(self, phase_name: str) -> dict[str, float]:
         """Get statistics for a specific phase across all requests."""
         times = [p.get_phase_time(phase_name) for p in self.profiles]
         if not times:
             return {"mean": 0, "min": 0, "max": 0, "p50": 0, "p95": 0, "p99": 0}
-        
+
         sorted_times = sorted(times)
         return {
             "mean": statistics.mean(times),
@@ -73,13 +76,13 @@ class ProfileResults:
             "p95": sorted_times[int(len(sorted_times) * 0.95)],
             "p99": sorted_times[int(len(sorted_times) * 0.99)],
         }
-    
+
     def get_total_time_stats(self) -> dict[str, float]:
         """Get statistics for total request time."""
         times = [p.total_time_us for p in self.profiles]
         if not times:
             return {"mean": 0, "min": 0, "max": 0, "p50": 0, "p95": 0, "p99": 0}
-        
+
         sorted_times = sorted(times)
         return {
             "mean": statistics.mean(times),
@@ -89,7 +92,7 @@ class ProfileResults:
             "p95": sorted_times[int(len(sorted_times) * 0.95)],
             "p99": sorted_times[int(len(sorted_times) * 0.99)],
         }
-    
+
     def print_report(self) -> None:
         """Print a formatted profiling report."""
         phase_names = [
@@ -101,16 +104,16 @@ class ProfileResults:
             "bls_signing",
             "response_encoding",
         ]
-        
+
         # Get phase stats
         phase_stats = {name: self.get_phase_stats(name) for name in phase_names}
         total_stats = self.get_total_time_stats()
-        
+
         # Calculate throughput
         total_time_sum = sum(p.total_time_us for p in self.profiles)
         avg_time_per_req = total_time_sum / self.total_requests if self.total_requests > 0 else 0
         theoretical_max_rps = 1_000_000 / avg_time_per_req if avg_time_per_req > 0 else 0
-        
+
         print("\n" + "=" * 80)
         print("PY3SIGNER PROFILING REPORT")
         print("=" * 80)
@@ -123,20 +126,20 @@ class ProfileResults:
         print(f"Max Request Time: {total_stats['max']:.1f} µs")
         print(f"Theoretical Max RPS (single-threaded): {theoretical_max_rps:.0f}")
         print()
-        
+
         # Calculate mean percentages
         print("Phase Breakdown (mean times):")
         print("-" * 80)
         print(f"{'Phase':<30} {'Time (µs)':<12} {'% of total':<12} {'P95 (µs)':<12}")
         print("-" * 80)
-        
+
         total_measured = 0.0
         for name in phase_names:
             stats = phase_stats[name]
             pct = (stats["mean"] / total_stats["mean"] * 100) if total_stats["mean"] > 0 else 0
             total_measured += stats["mean"]
             print(f"{name:<30} {stats['mean']:<12.1f} {pct:<12.1f} {stats['p95']:<12.1f}")
-        
+
         print("-" * 80)
         # Calculate overhead (time not accounted for by measured phases)
         overhead = total_stats["mean"] - total_measured
@@ -144,26 +147,28 @@ class ProfileResults:
         print(f"{'(overhead/unmeasured)':<30} {overhead:<12.1f} {overhead_pct:<12.1f}")
         print(f"{'TOTAL':<30} {total_stats['mean']:<12.1f} {100.0:<12.1f}")
         print("=" * 80)
-        
+
         # Identify bottlenecks
         print("\nBOTTLENECK ANALYSIS:")
         print("-" * 80)
-        
+
         sorted_phases = sorted(
-            [(name, stats["mean"], stats["mean"] / total_stats["mean"] * 100) 
-             for name, stats in phase_stats.items()],
+            [
+                (name, stats["mean"], stats["mean"] / total_stats["mean"] * 100)
+                for name, stats in phase_stats.items()
+            ],
             key=lambda x: x[1],
-            reverse=True
+            reverse=True,
         )
-        
+
         for i, (name, time_us, pct) in enumerate(sorted_phases[:3], 1):
             print(f"  {i}. {name}: {time_us:.1f} µs ({pct:.1f}% of total)")
-        
+
         # Compare to theoretical max
         raw_signing_time = phase_stats["bls_signing"]["mean"]
         http_overhead = total_stats["mean"] - raw_signing_time
         overhead_ratio = http_overhead / raw_signing_time if raw_signing_time > 0 else 0
-        
+
         print(f"\nRAW vs HTTP COMPARISON:")
         print(f"  Raw BLS signing: {raw_signing_time:.1f} µs")
         print(f"  HTTP stack overhead: {http_overhead:.1f} µs ({overhead_ratio:.1f}x raw signing)")
@@ -310,23 +315,23 @@ async def profile_single_request(
     auth_token: str | None,
 ) -> RequestProfile:
     """Profile a single signing request with detailed timing.
-    
+
     Note: Since we can't instrument the server directly from the client,
     we measure round-trip timing and use server-side profiling if available.
     For comprehensive profiling, we need to instrument the server code.
     """
     profile = RequestProfile()
-    
+
     headers = {"Content-Type": "application/json"}
     if auth_token:
         headers["Authorization"] = f"Bearer {auth_token}"
 
     payload = create_signing_request()
     payload_json = json.dumps(payload)
-    
+
     # Measure total client-side time (includes network latency)
     start_total = time.perf_counter()
-    
+
     try:
         # Use raw bytes to avoid extra serialization timing
         async with session.post(
@@ -336,9 +341,9 @@ async def profile_single_request(
         ) as response:
             await response.read()  # Read full response
             end_total = time.perf_counter()
-            
+
             profile.total_time_us = (end_total - start_total) * 1_000_000
-            
+
             # If server returns profiling data, parse it
             if response.status == 200:
                 try:
@@ -350,12 +355,12 @@ async def profile_single_request(
                             profile.add_phase(phase_name, phase_time_us)
                 except:
                     pass
-            
+
     except Exception as e:
         end_total = time.perf_counter()
         profile.total_time_us = (end_total - start_total) * 1_000_000
         print(f"Request failed: {e}")
-    
+
     return profile
 
 
@@ -367,18 +372,18 @@ async def run_client_side_profile(
 ) -> ProfileResults:
     """Run client-side profiling of signing requests."""
     results = ProfileResults()
-    
+
     timeout = aiohttp.ClientTimeout(total=30)
     connector = aiohttp.TCPConnector(limit=10, limit_per_host=10)
-    
+
     async with aiohttp.ClientSession(timeout=timeout, connector=connector) as session:
         for i in range(num_requests):
             profile = await profile_single_request(session, base_url, pubkey, auth_token)
             results.add_profile(profile)
-            
+
             if (i + 1) % 100 == 0:
                 print(f"  Completed {i + 1}/{num_requests} requests...")
-    
+
     return results
 
 
@@ -807,20 +812,20 @@ async def run_server(config: Config) -> None:
 if __name__ == "__main__":
     from py3signer.config import Config
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Run py3signer with profiling")
     parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
     parser.add_argument("--port", type=int, default=8080, help="Port to bind to")
     parser.add_argument("--keystore-path", help="Path to keystores")
-    
+
     args = parser.parse_args()
-    
+
     config = Config(
         host=args.host,
         port=args.port,
         key_store_path=args.keystore_path,
     )
-    
+
     try:
         asyncio.run(run_server(config))
     except KeyboardInterrupt:
@@ -834,7 +839,7 @@ def write_instrumented_handlers() -> None:
     with open(handlers_path, "w") as f:
         f.write(create_instrumented_handler_module())
     print(f"Created {handlers_path}")
-    
+
     server_path = "/home/admin/.openclaw/workspace/py3signer/scripts/profile_server.py"
     with open(server_path, "w") as f:
         f.write(create_instrumented_server_module())
@@ -848,14 +853,14 @@ async def run_profile_with_server(
 ) -> ProfileResults:
     """Run profiling against a running server."""
     results = ProfileResults()
-    
+
     headers = {"Content-Type": "application/json"}
     if auth_token:
         headers["Authorization"] = f"Bearer {auth_token}"
 
     # First, import a test keystore
     timeout = aiohttp.ClientTimeout(total=30)
-    
+
     async with aiohttp.ClientSession(timeout=timeout) as session:
         # Check health and get pubkey
         pubkey = None
@@ -870,7 +875,9 @@ async def run_profile_with_server(
 
         # Try to get existing pubkey
         try:
-            async with session.get(f"{base_url}/api/v1/eth2/publicKeys", headers=headers) as response:
+            async with session.get(
+                f"{base_url}/api/v1/eth2/publicKeys", headers=headers
+            ) as response:
                 if response.status == 200:
                     keys = await response.json()
                     if keys:
@@ -906,7 +913,7 @@ async def run_profile_with_server(
         # Run profiling requests
         print(f"\nRunning {num_requests} profiled requests...")
         payload = create_signing_request()
-        
+
         for i in range(num_requests):
             try:
                 start = time.perf_counter()
@@ -917,25 +924,25 @@ async def run_profile_with_server(
                 ) as response:
                     data = await response.json()
                     end = time.perf_counter()
-                    
+
                     profile = RequestProfile()
                     profile.total_time_us = (end - start) * 1_000_000
-                    
+
                     # Extract server profiling data if available
                     if "_profile" in data:
                         server_profile = data["_profile"]
                         for phase_name, phase_time in server_profile.items():
                             if phase_name != "total":
                                 profile.add_phase(phase_name, phase_time)
-                    
+
                     results.add_profile(profile)
-                    
+
                     if (i + 1) % 100 == 0:
                         print(f"  Completed {i + 1}/{num_requests} requests...")
-                        
+
             except Exception as e:
                 print(f"Request {i} failed: {e}")
-    
+
     return results
 
 
@@ -1001,7 +1008,7 @@ Examples:
 
     # Write the instrumented handlers
     write_instrumented_handlers()
-    
+
     if args.setup_only:
         print("\nSetup complete. Instrumented handlers written.")
         print("To use: Modify py3signer to use handlers_profiled.ProfilingAPIHandler")
@@ -1012,24 +1019,27 @@ Examples:
     if args.start_server:
         import subprocess
         import os
-        
+
         print("Starting profiled server...")
         env = os.environ.copy()
         env["PYTHONPATH"] = "/home/admin/.openclaw/workspace/py3signer"
-        
+
         server_process = subprocess.Popen(
             [
                 sys.executable,
-                "-m", "py3signer",
-                "--host", "127.0.0.1",
-                "--port", str(args.port),
+                "-m",
+                "py3signer",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                str(args.port),
             ],
             cwd="/home/admin/.openclaw/workspace/py3signer",
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        
+
         # Wait for server to start
         print("Waiting for server to start...")
         await asyncio.sleep(2)
@@ -1042,10 +1052,10 @@ Examples:
             num_requests=args.requests,
             auth_token=args.auth_token,
         )
-        
+
         # Print the report
         results.print_report()
-        
+
     finally:
         if server_process:
             print("\nStopping server...")
@@ -1067,5 +1077,6 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"Error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
