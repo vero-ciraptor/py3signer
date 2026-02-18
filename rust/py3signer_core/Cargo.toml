@@ -8,7 +8,7 @@ name = "py3signer_core"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.24", features = ["extension-module"] }
+pyo3 = { version = "0.28", features = ["extension-module"] }
 blst = "0.3"
 sha2 = "0.10"
 hex = "0.4"

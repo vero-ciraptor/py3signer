@@ -13,7 +13,7 @@ fn hash_to_g2(message: &[u8], domain: &[u8]) -> [u8; 32] {
 }
 
 /// PyO3 wrapper for BLS SecretKey
-#[pyclass(name = "SecretKey")]
+#[pyclass(name = "SecretKey", from_py_object)]
 #[derive(Clone)]
 pub struct PySecretKey {
     inner: Arc<SecretKey>,
@@ -42,7 +42,7 @@ impl PySecretKey {
     /// Serialize to 32 bytes
     fn to_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
         let bytes = self.inner.to_bytes();
-        Ok(pyo3::types::PyBytes::new_bound(py, &bytes))
+        Ok(pyo3::types::PyBytes::new(py, &bytes))
     }
     
     /// Get the corresponding public key
@@ -54,7 +54,7 @@ impl PySecretKey {
 }
 
 /// PyO3 wrapper for BLS PublicKey
-#[pyclass(name = "PublicKey")]
+#[pyclass(name = "PublicKey", from_py_object)]
 #[derive(Clone)]
 pub struct PyPublicKey {
     inner: PublicKey,
@@ -81,12 +81,12 @@ impl PyPublicKey {
     fn to_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
         // For min_sig, public keys are G1 points: 48 bytes compressed
         let bytes = self.inner.compress();
-        Ok(pyo3::types::PyBytes::new_bound(py, &bytes))
+        Ok(pyo3::types::PyBytes::new(py, &bytes))
     }
 }
 
 /// PyO3 wrapper for BLS Signature
-#[pyclass(name = "Signature")]
+#[pyclass(name = "Signature", from_py_object)]
 #[derive(Clone)]
 pub struct PySignature {
     inner: BlstSignature,
@@ -113,7 +113,7 @@ impl PySignature {
     fn to_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
         // For min_sig, signatures are G2 points: 96 bytes compressed
         let bytes = self.inner.compress();
-        Ok(pyo3::types::PyBytes::new_bound(py, &bytes))
+        Ok(pyo3::types::PyBytes::new(py, &bytes))
     }
 }
 
@@ -176,7 +176,7 @@ fn generate_random_key(py: Python) -> PyResult<PySecretKey> {
     use pyo3::types::PyBytes;
     
     // Get random bytes from Python's secrets module
-    let secrets = py.import_bound("secrets")?;
+    let secrets = py.import("secrets")?;
     let token_bytes = secrets.getattr("token_bytes")?;
     
     // BLS12-381 scalar field order is slightly less than 2^255
