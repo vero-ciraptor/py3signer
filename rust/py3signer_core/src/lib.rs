@@ -118,19 +118,28 @@ impl PySignature {
 }
 
 /// Sign a message with a secret key and domain
+/// Releases the GIL during the BLS signing operation for better concurrency
 #[pyfunction]
-fn sign(secret_key: &PySecretKey, message: &[u8], domain: &[u8]) -> PyResult<PySignature> {
+fn sign(py: Python, secret_key: &PySecretKey, message: &[u8], domain: &[u8]) -> PyResult<PySignature> {
     let hash = hash_to_g2(message, domain);
 
-    // blst::min_sig::SecretKey::sign returns Signature directly (not Result)
-    let signature = secret_key.inner.sign(&hash, b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_", &[]);
+    // Clone the Arc to move it into the closure
+    let sk = Arc::clone(&secret_key.inner);
+
+    // Release the GIL during the BLS signing operation
+    let signature = py.detach(move || {
+        // blst::min_sig::SecretKey::sign returns Signature directly (not Result)
+        sk.sign(&hash, b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_", &[])
+    });
 
     Ok(PySignature { inner: signature })
 }
 
 /// Verify a signature
+/// Releases the GIL during the BLS verification operation for better concurrency
 #[pyfunction]
 fn verify(
+    py: Python,
     public_key: &PyPublicKey,
     message: &[u8],
     signature: &PySignature,
@@ -138,15 +147,22 @@ fn verify(
 ) -> PyResult<bool> {
     let hash = hash_to_g2(message, domain);
 
-    // Correct API for min_pk: verify(sig_groupcheck, msg, dst, aug, pk, pk_validate)
-    let result = signature.inner.verify(
-        true,  // sig_groupcheck
-        &hash, // msg (already hashed)
-        b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_", // dst
-        &[],   // aug
-        &public_key.inner, // pk
-        true,  // pk_validate
-    );
+    // Clone the inner values to move them into the closure
+    let pk = public_key.inner.clone();
+    let sig = signature.inner.clone();
+
+    // Release the GIL during the BLS verification operation
+    let result = py.detach(move || {
+        // Correct API for min_pk: verify(sig_groupcheck, msg, dst, aug, pk, pk_validate)
+        sig.verify(
+            true,  // sig_groupcheck
+            &hash, // msg (already hashed)
+            b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_", // dst
+            &[],   // aug
+            &pk,   // pk
+            true,  // pk_validate
+        )
+    });
 
     match result {
         blst::BLST_ERROR::BLST_SUCCESS => Ok(true),
@@ -318,9 +334,15 @@ mod keystore {
 }
 
 /// Decrypt an EIP-2335 keystore and return the secret key bytes
+/// Releases the GIL during the KDF and decryption operations for better concurrency
 #[pyfunction]
-fn decrypt_keystore(keystore_json: &str, password: &str) -> PyResult<Vec<u8>> {
-    keystore::decrypt_keystore(keystore_json, password)
+fn decrypt_keystore(py: Python, keystore_json: &str, password: &str) -> PyResult<Vec<u8>> {
+    // Clone the inputs to move them into the closure
+    let keystore_json = keystore_json.to_string();
+    let password = password.to_string();
+
+    // Release the GIL during the expensive KDF and decryption operations
+    py.detach(move || keystore::decrypt_keystore(&keystore_json, &password))
 }
 
 /// Module initialization
