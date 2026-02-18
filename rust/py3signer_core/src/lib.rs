@@ -365,8 +365,7 @@ mod keystore {
             }
             _ => {
                 return Err(PyValueError::new_err(format!(
-                    "Unsupported cipher function: {}. Only aes-128-ctr and aes-256-ctr are supported.",
-                    cipher_function
+                    "Unsupported cipher function: {cipher_function}. Only aes-128-ctr and aes-256-ctr are supported."
                 )));
             }
         }
