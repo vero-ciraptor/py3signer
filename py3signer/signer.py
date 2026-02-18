@@ -17,7 +17,7 @@ class SignerError(Exception):
 class Signer:
     """Handles BLS signing operations."""
     
-    # Standard Ethereum 2.0 domains
+    # Standard Ethereum 2.0 domains (kept for reference)
     DOMAINS: dict[str, bytes] = {
         "beacon_proposer": bytes.fromhex("00000000"),
         "beacon_attester": bytes.fromhex("01000000"),
@@ -40,8 +40,7 @@ class Signer:
         self,
         pubkey_hex: str,
         data: bytes,
-        domain: bytes | None = None,
-        domain_name: str | None = None
+        domain: bytes,
     ) -> Signature:
         """
         Sign data with the specified key.
@@ -49,8 +48,7 @@ class Signer:
         Args:
             pubkey_hex: The public key hex identifier
             data: The data to sign
-            domain: The 4-byte domain (overrides domain_name)
-            domain_name: Named domain from DOMAINS dict
+            domain: The 4-byte domain
         
         Returns:
             The BLS signature
@@ -58,14 +56,6 @@ class Signer:
         Raises:
             SignerError: If key not found or signing fails
         """
-        # Validate domain first (before key lookup)
-        if domain is None:
-            if domain_name is None:
-                raise SignerError("Either domain or domain_name must be provided")
-            domain = self.DOMAINS.get(domain_name)
-            if domain is None:
-                raise SignerError(f"Unknown domain: {domain_name}")
-        
         if len(domain) != 4:
             raise SignerError(f"Domain must be 4 bytes, got {len(domain)}")
         
@@ -80,51 +70,3 @@ class Signer:
             return signature
         except Exception as e:
             raise SignerError(f"Signing failed: {e}")
-    
-    def sign_attestation(
-        self,
-        pubkey_hex: str,
-        attestation_data: bytes
-    ) -> Signature:
-        """Sign an attestation."""
-        return self.sign_data(
-            pubkey_hex,
-            attestation_data,
-            domain_name="beacon_attester"
-        )
-    
-    def sign_block(
-        self,
-        pubkey_hex: str,
-        block_data: bytes
-    ) -> Signature:
-        """Sign a beacon block."""
-        return self.sign_data(
-            pubkey_hex,
-            block_data,
-            domain_name="beacon_proposer"
-        )
-    
-    def sign_randao(
-        self,
-        pubkey_hex: str,
-        epoch: bytes
-    ) -> Signature:
-        """Sign a RANDAO reveal."""
-        return self.sign_data(
-            pubkey_hex,
-            epoch,
-            domain_name="randao"
-        )
-    
-    def sign_voluntary_exit(
-        self,
-        pubkey_hex: str,
-        exit_data: bytes
-    ) -> Signature:
-        """Sign a voluntary exit."""
-        return self.sign_data(
-            pubkey_hex,
-            exit_data,
-            domain_name="voluntary_exit"
-        )

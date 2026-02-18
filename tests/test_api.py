@@ -5,6 +5,20 @@ import pytest
 from aiohttp import web
 
 
+# Valid fork info fixture for tests
+@pytest.fixture
+def valid_fork_info():
+    """Return a valid fork info structure."""
+    return {
+        "fork": {
+            "previous_version": "0x00000000",
+            "current_version": "0x00000000",
+            "epoch": "0"
+        },
+        "genesis_validators_root": "0x0000000000000000000000000000000000000000000000000000000000000000"
+    }
+
+
 @pytest.mark.asyncio
 async def test_health_endpoint(client):
     """Test the health check endpoint."""
@@ -266,43 +280,231 @@ async def test_sign_missing_identifier(client):
     assert resp.status in [404, 405]  # Route not found or method not allowed
 
 
-@pytest.mark.parametrize("request_body,expected_status", [
-    ({}, 400),  # missing signingRoot
-    ({"signingRoot": "not_hex", "domain_name": "beacon_attester"}, 400),  # invalid hex
-    ({"signingRoot": "abcd1234", "domain_name": "beacon_attester"}, 400),  # wrong length
-    ({"signingRoot": "abcd1234" * 8}, 400),  # no domain or domain_name
+# Spec-compliant sign request tests
+
+@pytest.mark.parametrize("request_body,expected_error", [
+    # Missing type discriminator
+    ({}, "missing required field"),
+    # Invalid type
+    ({"type": "INVALID_TYPE"}, "Validation error"),
+    # Missing fork_info
+    ({"type": "ATTESTATION"}, "missing required field"),
+    # Invalid signingRoot length
+    ({"type": "ATTESTATION", "signingRoot": "0xabcd", "fork_info": {"fork": {"previous_version": "0x00", "current_version": "0x00", "epoch": "0"}, "genesis_validators_root": "0x00" * 32}}, "signingRoot"),
 ])
 @pytest.mark.asyncio
-async def test_sign_validation_errors(client, request_body, expected_status):
+async def test_sign_validation_errors(client, valid_fork_info, request_body, expected_error):
     """Test signing with various validation errors."""
+    # Add fork_info to requests that need it
+    if "fork_info" not in request_body and "type" in request_body:
+        request_body["fork_info"] = valid_fork_info
+    
     pubkey = "a" * 96
     resp = await client.post(
         f"/api/v1/eth2/sign/{pubkey}",
         json=request_body
     )
-    assert resp.status == expected_status
+    assert resp.status == 400
     
     data = await resp.json()
     assert "error" in data
 
 
 @pytest.mark.asyncio
-async def test_sign_key_not_found(client):
+async def test_sign_key_not_found(client, valid_fork_info):
     """Test signing with non-existent key."""
     pubkey = "a" * 96
     resp = await client.post(
         f"/api/v1/eth2/sign/{pubkey}",
         json={
+            "type": "ATTESTATION",
+            "fork_info": valid_fork_info,
             "signingRoot": "abcd1234" * 8,  # 64 hex chars = 32 bytes
-            "domainName": "beacon_attester"
+            "attestation": {
+                "slot": "123",
+                "index": "0",
+                "beacon_block_root": "0x" + "00" * 32,
+                "source": {"epoch": "0", "root": "0x" + "00" * 32},
+                "target": {"epoch": "1", "root": "0x" + "00" * 32}
+            }
         }
     )
     assert resp.status == 404
 
 
 @pytest.mark.asyncio
-async def test_full_flow(client, sample_keystore, sample_keystore_password):
-    """Test the full import -> list -> sign -> delete flow."""
+async def test_sign_missing_signing_root(client, valid_fork_info):
+    """Test signing without signingRoot (required until SSZ computation is implemented)."""
+    pubkey = "a" * 96
+    resp = await client.post(
+        f"/api/v1/eth2/sign/{pubkey}",
+        json={
+            "type": "ATTESTATION",
+            "fork_info": valid_fork_info,
+            "attestation": {
+                "slot": "123",
+                "index": "0",
+                "beacon_block_root": "0x" + "00" * 32,
+                "source": {"epoch": "0", "root": "0x" + "00" * 32},
+                "target": {"epoch": "1", "root": "0x" + "00" * 32}
+            }
+        }
+    )
+    assert resp.status == 400
+    
+    data = await resp.json()
+    assert "signingRoot is required" in data["error"]
+
+
+@pytest.mark.asyncio
+async def test_sign_attestation(client, sample_keystore, sample_keystore_password, valid_fork_info):
+    """Test signing an attestation with spec-compliant format."""
+    # First import a keystore
+    keystore_json = json.dumps(sample_keystore)
+    resp = await client.post(
+        "/eth/v1/keystores",
+        json={
+            "keystores": [keystore_json],
+            "passwords": [sample_keystore_password]
+        }
+    )
+    assert resp.status == 200
+    pubkey = sample_keystore["pubkey"]
+    
+    # Sign an attestation
+    resp = await client.post(
+        f"/api/v1/eth2/sign/{pubkey}",
+        json={
+            "type": "ATTESTATION",
+            "fork_info": valid_fork_info,
+            "signingRoot": "0x" + "00" * 32,
+            "attestation": {
+                "slot": "123",
+                "index": "0",
+                "beacon_block_root": "0x" + "00" * 32,
+                "source": {"epoch": "0", "root": "0x" + "00" * 32},
+                "target": {"epoch": "1", "root": "0x" + "00" * 32}
+            }
+        }
+    )
+    assert resp.status == 200
+    
+    data = await resp.json()
+    assert "signature" in data
+    assert data["signature"].startswith("0x")
+    assert len(data["signature"]) == 194  # 0x + 96 bytes * 2 = 194
+
+
+@pytest.mark.asyncio
+async def test_sign_randao(client, sample_keystore, sample_keystore_password, valid_fork_info):
+    """Test signing a RANDAO reveal with spec-compliant format."""
+    # First import a keystore
+    keystore_json = json.dumps(sample_keystore)
+    resp = await client.post(
+        "/eth/v1/keystores",
+        json={
+            "keystores": [keystore_json],
+            "passwords": [sample_keystore_password]
+        }
+    )
+    assert resp.status == 200
+    pubkey = sample_keystore["pubkey"]
+    
+    # Sign a RANDAO reveal
+    resp = await client.post(
+        f"/api/v1/eth2/sign/{pubkey}",
+        json={
+            "type": "RANDAO_REVEAL",
+            "fork_info": valid_fork_info,
+            "signingRoot": "0x" + "00" * 32,
+            "randao_reveal": {
+                "epoch": "100"
+            }
+        }
+    )
+    assert resp.status == 200
+    
+    data = await resp.json()
+    assert "signature" in data
+
+
+@pytest.mark.asyncio
+async def test_sign_voluntary_exit(client, sample_keystore, sample_keystore_password, valid_fork_info):
+    """Test signing a voluntary exit with spec-compliant format."""
+    # First import a keystore
+    keystore_json = json.dumps(sample_keystore)
+    resp = await client.post(
+        "/eth/v1/keystores",
+        json={
+            "keystores": [keystore_json],
+            "passwords": [sample_keystore_password]
+        }
+    )
+    assert resp.status == 200
+    pubkey = sample_keystore["pubkey"]
+    
+    # Sign a voluntary exit
+    resp = await client.post(
+        f"/api/v1/eth2/sign/{pubkey}",
+        json={
+            "type": "VOLUNTARY_EXIT",
+            "fork_info": valid_fork_info,
+            "signingRoot": "0x" + "00" * 32,
+            "voluntary_exit": {
+                "epoch": "100",
+                "validator_index": "5"
+            }
+        }
+    )
+    assert resp.status == 200
+    
+    data = await resp.json()
+    assert "signature" in data
+
+
+@pytest.mark.asyncio
+async def test_sign_block_v2(client, sample_keystore, sample_keystore_password, valid_fork_info):
+    """Test signing a block with spec-compliant BLOCK_V2 format."""
+    # First import a keystore
+    keystore_json = json.dumps(sample_keystore)
+    resp = await client.post(
+        "/eth/v1/keystores",
+        json={
+            "keystores": [keystore_json],
+            "passwords": [sample_keystore_password]
+        }
+    )
+    assert resp.status == 200
+    pubkey = sample_keystore["pubkey"]
+    
+    # Sign a block v2
+    resp = await client.post(
+        f"/api/v1/eth2/sign/{pubkey}",
+        json={
+            "type": "BLOCK_V2",
+            "fork_info": valid_fork_info,
+            "signingRoot": "0x" + "00" * 32,
+            "beacon_block": {
+                "version": "phase0",
+                "block": {
+                    "slot": "100",
+                    "proposer_index": "0",
+                    "parent_root": "0x" + "00" * 32,
+                    "state_root": "0x" + "00" * 32,
+                    "body": {}
+                }
+            }
+        }
+    )
+    assert resp.status == 200
+    
+    data = await resp.json()
+    assert "signature" in data
+
+
+@pytest.mark.asyncio
+async def test_full_flow(client, sample_keystore, sample_keystore_password, valid_fork_info):
+    """Test the full import -> list -> sign -> delete flow with spec-compliant format."""
     # 1. Import
     keystore_json = json.dumps(sample_keystore)
     resp = await client.post(
@@ -323,13 +525,20 @@ async def test_full_flow(client, sample_keystore, sample_keystore_password):
     assert len(data["data"]) == 1
     pubkey = data["data"][0]["validating_pubkey"]
     
-    # 3. Sign
-    signing_root = "0x" + "00" * 32  # 32 bytes of zeros
+    # 3. Sign with spec-compliant format
     resp = await client.post(
         f"/api/v1/eth2/sign/{pubkey}",
         json={
-            "signingRoot": signing_root,
-            "domainName": "beacon_attester"
+            "type": "ATTESTATION",
+            "fork_info": valid_fork_info,
+            "signingRoot": "0x" + "00" * 32,
+            "attestation": {
+                "slot": "123",
+                "index": "0",
+                "beacon_block_root": "0x" + "00" * 32,
+                "source": {"epoch": "0", "root": "0x" + "00" * 32},
+                "target": {"epoch": "1", "root": "0x" + "00" * 32}
+            }
         }
     )
     assert resp.status == 200

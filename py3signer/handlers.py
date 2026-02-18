@@ -10,6 +10,12 @@ import msgspec
 from .storage import KeyStorage
 from .signer import Signer, SignerError
 from .keystore import Keystore, KeystoreError
+from .signing_types import (
+    SignRequest,
+    sign_request_decoder,
+    get_domain_for_request,
+    validate_signing_root,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,43 +44,9 @@ class KeystoreDeleteRequest(msgspec.Struct):
             raise ValueError("pubkeys must not be empty")
 
 
-class SignRequest(msgspec.Struct):
-    """Request struct for signing data."""
-    signing_root: str | None = msgspec.field(name="signingRoot", default=None)
-    domain: str | None = None
-    domain_name: str | None = msgspec.field(name="domainName", default=None)
-
-    def __post_init__(self) -> None:
-        """Validate signing request."""
-        # Validate signing_root if provided (must be 32 bytes = 64 hex chars)
-        if self.signing_root is not None:
-            signing_root_clean = self.signing_root.replace("0x", "")
-            if len(signing_root_clean) != 64:
-                raise ValueError("signingRoot must be 32 bytes (64 hex characters)")
-            try:
-                bytes.fromhex(signing_root_clean)
-            except ValueError:
-                raise ValueError("signingRoot must be valid hexadecimal")
-        
-        # Validate domain if provided (must be 4 bytes = 8 hex chars)
-        if self.domain is not None:
-            domain_clean = self.domain.replace("0x", "")
-            if len(domain_clean) != 8:
-                raise ValueError("domain must be 4 bytes (8 hex characters)")
-            try:
-                bytes.fromhex(domain_clean)
-            except ValueError:
-                raise ValueError("domain must be valid hexadecimal")
-        
-        # Must have either domain or domain_name
-        if self.domain is None and self.domain_name is None:
-            raise ValueError("Either domain or domainName must be provided")
-
-
 # JSON decoders for request structs
 keystore_import_decoder = msgspec.json.Decoder(KeystoreImportRequest)
 keystore_delete_decoder = msgspec.json.Decoder(KeystoreDeleteRequest)
-sign_request_decoder = msgspec.json.Decoder(SignRequest)
 
 
 class APIHandler:
@@ -286,11 +258,14 @@ class APIHandler:
     async def sign(self, request: web.Request) -> web.Response:
         """POST /api/v1/eth2/sign/:identifier - Sign data.
 
-        Note: This endpoint uses a simplified request format compared to the
-        full Ethereum Remote Signing API spec. The spec supports typed signing
-        requests with discriminators (e.g., {"type": "ATTESTATION", ...}),
-        but py3signer currently only supports the simplified format with
-        signingRoot and domain/domainName.
+        This endpoint implements the Ethereum Remote Signing API specification,
+        using typed discriminated signing requests. The 'type' field determines
+        the signing operation, and the appropriate domain is computed based on
+        the type and fork_info.
+        
+        Note: SSZ signing root computation is not yet implemented. Callers must
+        provide the signingRoot field. In the future, signingRoot may be computed
+        from the type-specific data when not provided.
         """
         await self._require_auth(request)
         
@@ -311,9 +286,9 @@ class APIHandler:
                 content_type="application/json"
             )
         
-        # Validate request with msgspec
+        # Parse and validate the discriminated sign request
         try:
-            sign_req = sign_request_decoder.decode(body_bytes)
+            sign_req: SignRequest = sign_request_decoder.decode(body_bytes)
         except (msgspec.ValidationError, msgspec.DecodeError) as e:
             raise web.HTTPBadRequest(
                 text=json.dumps({"error": f"Validation error: {e}"}),
@@ -325,25 +300,37 @@ class APIHandler:
                 content_type="application/json"
             )
         
-        # Convert hex to bytes
-        if sign_req.signing_root is None:
+        # Validate signingRoot - required since we don't compute SSZ roots
+        try:
+            message = validate_signing_root(sign_req.signing_root)
+        except ValueError as e:
             raise web.HTTPBadRequest(
-                text=json.dumps({"error": "signingRoot is required (py3signer does not compute signing roots from SSZ data)"}),
+                text=json.dumps({"error": str(e)}),
                 content_type="application/json"
             )
-        message = bytes.fromhex(sign_req.signing_root.replace("0x", ""))
         
-        # Determine domain
-        domain: bytes | None = None
-        if sign_req.domain:
-            domain = bytes.fromhex(sign_req.domain.replace("0x", ""))
+        if message is None:
+            # In the future, we could compute the signing root from type-specific data
+            # For now, signingRoot is required
+            raise web.HTTPBadRequest(
+                text=json.dumps({"error": "signingRoot is required (SSZ signing root computation not yet implemented)"}),
+                content_type="application/json"
+            )
+        
+        # Get domain based on signing type
+        try:
+            domain = get_domain_for_request(sign_req)
+        except ValueError as e:
+            raise web.HTTPInternalServerError(
+                text=json.dumps({"error": str(e)}),
+                content_type="application/json"
+            )
         
         try:
             signature = self._signer.sign_data(
                 pubkey_hex=pubkey_hex,
                 data=message,
                 domain=domain,
-                domain_name=sign_req.domain_name
             )
             
             signature_hex = signature.to_bytes().hex()

@@ -112,6 +112,7 @@ class TestCryptoCore:
         sig2 = Signature.from_bytes(sig_bytes)
         assert sig1.to_bytes().hex() == sig2.to_bytes().hex()
     
+
 class TestSigner:
     """Tests for the Signer class."""
     
@@ -123,23 +124,19 @@ class TestSigner:
     def test_sign_data_key_not_found(self, storage: KeyStorage) -> None:
         """Test signing with non-existent key."""
         signer = Signer(storage)
+        domain = bytes.fromhex("01000000")  # beacon_attester domain
         
         with pytest.raises(SignerError) as exc_info:
-            signer.sign_data("nonexistent", b"data", domain_name="beacon_attester")
+            signer.sign_data("nonexistent", b"data", domain)
         assert "not found" in str(exc_info.value).lower()
     
-    @pytest.mark.parametrize("domain_name,domain_bytes,expected_error", [
-        (None, None, "domain"),  # No domain provided
-        ("unknown_domain", None, "unknown"),  # Unknown domain name
-        (None, b"\x00\x00", "4 bytes"),  # Invalid domain length (2 bytes)
-    ], ids=["no_domain", "unknown_domain", "invalid_domain_length"])
-    def test_sign_data_domain_validation(self, storage: KeyStorage, domain_name, domain_bytes, expected_error) -> None:
-        """Test domain validation errors."""
+    def test_sign_data_invalid_domain_length(self, storage: KeyStorage) -> None:
+        """Test signing with invalid domain length."""
         signer = Signer(storage)
         
         with pytest.raises(SignerError) as exc_info:
-            signer.sign_data("any", b"data", domain_name=domain_name, domain=domain_bytes)
-        assert expected_error in str(exc_info.value).lower()
+            signer.sign_data("any", b"data", b"\x00\x00")  # 2 bytes instead of 4
+        assert "4 bytes" in str(exc_info.value).lower()
     
     def test_sign_data_success(self, storage: KeyStorage) -> None:
         """Test successful signing."""
@@ -151,10 +148,11 @@ class TestSigner:
         signer = Signer(storage)
         
         message = b"\x00" * 32
+        domain = bytes.fromhex("01000000")  # beacon_attester
         signature = signer.sign_data(
             pk.to_bytes().hex(),
             message,
-            domain_name="beacon_attester"
+            domain,
         )
         
         assert signature is not None
@@ -174,37 +172,8 @@ class TestSigner:
         signature = signer.sign_data(
             pk.to_bytes().hex(),
             message,
-            domain=custom_domain
+            custom_domain,
         )
-        
-        assert signature is not None
-        assert len(signature.to_bytes()) == 96
-
-
-class TestSignerDomains:
-    """Tests for different signing domains."""
-    
-    @pytest.fixture
-    def signer_with_key(self, storage: KeyStorage):
-        """Create a signer with a key added."""
-        sk = generate_random_key()
-        pk = sk.public_key()
-        storage.add_key(pk, sk)
-        
-        signer = Signer(storage)
-        return signer, pk.to_bytes().hex()
-    
-    @pytest.mark.parametrize("domain_method,test_data", [
-        ("sign_attestation", b"\x00" * 32),
-        ("sign_block", b"\x00" * 32),
-        ("sign_randao", b"\x00" * 32),
-        ("sign_voluntary_exit", b"\x00" * 32),
-    ], ids=["attestation", "block", "randao", "voluntary_exit"])
-    def test_sign_with_domain(self, signer_with_key, domain_method, test_data) -> None:
-        """Test signing with different domain methods."""
-        signer, pubkey = signer_with_key
-        
-        signature = getattr(signer, domain_method)(pubkey, test_data)
         
         assert signature is not None
         assert len(signature.to_bytes()) == 96
