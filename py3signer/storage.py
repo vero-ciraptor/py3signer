@@ -21,6 +21,7 @@ class KeyPair:
     secret_key: SecretKey
     path: str
     description: str | None = None
+    persistent: bool = True  # Whether this key should be persisted to disk
 
 
 class KeyStorage:
@@ -113,8 +114,18 @@ class KeyStorage:
         description: str | None = None,
         keystore_json: str | None = None,
         password: str | None = None,
+        persistent: bool = True,
     ) -> tuple[str, bool]:
         """Add a key to storage. Optionally persists to disk if keystore_path is set.
+
+        Args:
+            pubkey: The public key
+            secret_key: The secret key
+            path: The derivation path
+            description: Optional description
+            keystore_json: Optional keystore JSON for persistence
+            password: Optional password for persistence
+            persistent: Whether this key should be persisted to disk
 
         Returns:
             Tuple of (pubkey_hex, persisted) where persisted indicates if disk write occurred.
@@ -125,16 +136,16 @@ class KeyStorage:
             raise ValueError(f"Key already exists: {pubkey_hex}")
 
         self._keys[pubkey_hex] = KeyPair(
-            pubkey=pubkey, secret_key=secret_key, path=path, description=description
+            pubkey=pubkey, secret_key=secret_key, path=path, description=description, persistent=persistent
         )
         KEYS_LOADED.set(len(self._keys))
         logger.info(f"Added key: {pubkey_hex[:20]}...")
 
-        persisted = False
-        if self._keystore_path is not None and keystore_json is not None and password is not None:
-            persisted = self._save_to_disk(pubkey_hex, keystore_json, password)
+        persisted_to_disk = False
+        if persistent and self._keystore_path is not None and keystore_json is not None and password is not None:
+            persisted_to_disk = self._save_to_disk(pubkey_hex, keystore_json, password)
 
-        return pubkey_hex, persisted
+        return pubkey_hex, persisted_to_disk
 
     def get_key(self, pubkey_hex: str) -> KeyPair | None:
         """Get a key pair by public key hex."""
@@ -153,12 +164,15 @@ class KeyStorage:
         if pubkey_hex not in self._keys:
             return False, False
 
+        key_pair = self._keys[pubkey_hex]
+        is_persistent = key_pair.persistent
+
         del self._keys[pubkey_hex]
         KEYS_LOADED.set(len(self._keys))
         logger.info(f"Removed key: {pubkey_hex[:20]}...")
 
         deleted_from_disk = False
-        if self._keystore_path is not None:
+        if is_persistent and self._keystore_path is not None:
             deleted_from_disk = self._delete_from_disk(pubkey_hex)
 
         return True, deleted_from_disk

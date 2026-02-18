@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from py3signer.bulk_loader import (
+    load_input_only_keystores,
     load_keystore_with_password,
     load_keystores_from_directory,
     scan_keystore_directory,
@@ -260,3 +261,182 @@ class TestBulkLoaderIntegration:
         # but the scanner should find them
         keystores = scan_keystore_directory(tmp_path)
         assert len(keystores) == 3
+
+
+class TestLoadKeystoresPersistentParameter:
+    """Tests for the persistent parameter in load_keystores_from_directory."""
+
+    def test_load_as_non_persistent(self, tmp_path: Path) -> None:
+        """Test loading keystores as non-persistent."""
+        test_data = Path(__file__).parent / "data"
+
+        # Create a valid keystore with unique pubkey
+        keystore_json = tmp_path / "keystore-m_12381_3600_0_0_0-16777216.json"
+        keystore_txt = tmp_path / "keystore-m_12381_3600_0_0_0-16777216.txt"
+
+        keystore_data = json.loads((test_data / "test_keystore_scrypt.json").read_text())
+        keystore_data["pubkey"] = (
+            "a792e85e01746b22e89c7289aa693c4413db2c83d1209380cc4e98fc132ba49c301606032f77089d90e2df0539d23037"
+        )
+        keystore_json.write_text(json.dumps(keystore_data))
+        keystore_txt.write_text("testpassword123")
+
+        storage = KeyStorage()
+        success, failures = load_keystores_from_directory(tmp_path, storage, persistent=False)
+
+        assert success == 1
+        assert failures == 0
+        assert len(storage) == 1
+
+        # Verify the key is marked as non-persistent by checking remove behavior
+        # (non-persistent keys should not trigger disk deletion)
+        pubkey_hex = "a792e85e01746b22e89c7289aa693c4413db2c83d1209380cc4e98fc132ba49c301606032f77089d90e2df0539d23037"
+        removed, deleted_from_disk = storage.remove_key(pubkey_hex)
+        assert removed is True
+        # deleted_from_disk should be False since key is non-persistent
+        assert deleted_from_disk is False
+
+
+class TestLoadInputOnlyKeystores:
+    """Tests for load_input_only_keystores function."""
+
+    def test_load_from_separate_directories(self, tmp_path: Path) -> None:
+        """Test loading keystores from separate directories."""
+        test_data = Path(__file__).parent / "data"
+
+        keystores_dir = tmp_path / "keystores"
+        passwords_dir = tmp_path / "passwords"
+        keystores_dir.mkdir()
+        passwords_dir.mkdir()
+
+        # Create keystore in keystores dir
+        keystore_json = keystores_dir / "test_keystore.json"
+        keystore_data = json.loads((test_data / "test_keystore_scrypt.json").read_text())
+        keystore_data["pubkey"] = (
+            "a792e85e01746b22e89c7289aa693c4413db2c83d1209380cc4e98fc132ba49c301606032f77089d90e2df0539d23037"
+        )
+        keystore_json.write_text(json.dumps(keystore_data))
+
+        # Create password in passwords dir with matching base name
+        password_txt = passwords_dir / "test_keystore.txt"
+        password_txt.write_text("testpassword123")
+
+        storage = KeyStorage()
+        success, failures = load_input_only_keystores(keystores_dir, passwords_dir, storage)
+
+        assert success == 1
+        assert failures == 0
+        assert len(storage) == 1
+
+        # Verify key is non-persistent
+        pubkey_hex = "a792e85e01746b22e89c7289aa693c4413db2c83d1209380cc4e98fc132ba49c301606032f77089d90e2df0539d23037"
+        removed, deleted_from_disk = storage.remove_key(pubkey_hex)
+        assert removed is True
+        assert deleted_from_disk is False  # Non-persistent
+
+    def test_missing_password_file(self, tmp_path: Path) -> None:
+        """Test handling when password file is missing in separate directory."""
+        keystores_dir = tmp_path / "keystores"
+        passwords_dir = tmp_path / "passwords"
+        keystores_dir.mkdir()
+        passwords_dir.mkdir()
+
+        # Create keystore but no password
+        keystore_json = keystores_dir / "test_keystore.json"
+        keystore_json.write_text('{"version": 4}')
+
+        storage = KeyStorage()
+        success, failures = load_input_only_keystores(keystores_dir, passwords_dir, storage)
+
+        assert success == 0
+        assert failures == 1  # Counts as failure due to missing password
+        assert len(storage) == 0
+
+    def test_nonexistent_keystores_path(self, tmp_path: Path) -> None:
+        """Test error when keystores path doesn't exist."""
+        keystores_dir = tmp_path / "keystores"
+        passwords_dir = tmp_path / "passwords"
+        passwords_dir.mkdir()
+
+        storage = KeyStorage()
+        with pytest.raises(ValueError, match="Keystores path does not exist"):
+            load_input_only_keystores(keystores_dir, passwords_dir, storage)
+
+    def test_nonexistent_passwords_path(self, tmp_path: Path) -> None:
+        """Test error when passwords path doesn't exist."""
+        keystores_dir = tmp_path / "keystores"
+        passwords_dir = tmp_path / "passwords"
+        keystores_dir.mkdir()
+
+        storage = KeyStorage()
+        with pytest.raises(ValueError, match="Passwords path does not exist"):
+            load_input_only_keystores(keystores_dir, passwords_dir, storage)
+
+    def test_keystores_path_is_file(self, tmp_path: Path) -> None:
+        """Test error when keystores path is a file."""
+        keystores_file = tmp_path / "keystores"
+        passwords_dir = tmp_path / "passwords"
+        keystores_file.write_text("not a directory")
+        passwords_dir.mkdir()
+
+        storage = KeyStorage()
+        with pytest.raises(ValueError, match="Keystores path is not a directory"):
+            load_input_only_keystores(keystores_file, passwords_dir, storage)
+
+    def test_passwords_path_is_file(self, tmp_path: Path) -> None:
+        """Test error when passwords path is a file."""
+        keystores_dir = tmp_path / "keystores"
+        passwords_file = tmp_path / "passwords"
+        keystores_dir.mkdir()
+        passwords_file.write_text("not a directory")
+
+        storage = KeyStorage()
+        with pytest.raises(ValueError, match="Passwords path is not a directory"):
+            load_input_only_keystores(keystores_dir, passwords_file, storage)
+
+    def test_multiple_keystores_with_mixed_success(self, tmp_path: Path) -> None:
+        """Test loading multiple keystores with some failures."""
+        test_data = Path(__file__).parent / "data"
+        original_keystore = json.loads((test_data / "test_keystore_scrypt.json").read_text())
+
+        keystores_dir = tmp_path / "keystores"
+        passwords_dir = tmp_path / "passwords"
+        keystores_dir.mkdir()
+        passwords_dir.mkdir()
+
+        # Valid keystore 1 - use the original with its actual pubkey
+        keystore1_json = keystores_dir / "keystore1.json"
+        keystore1_data = original_keystore.copy()
+        keystore1_json.write_text(json.dumps(keystore1_data))
+        (passwords_dir / "keystore1.txt").write_text("testpassword123")
+
+        # Keystore with wrong password (will fail to decrypt)
+        keystore2_json = keystores_dir / "keystore2.json"
+        keystore2_data = original_keystore.copy()
+        keystore2_json.write_text(json.dumps(keystore2_data))
+        (passwords_dir / "keystore2.txt").write_text("wrongpassword")
+
+        # Keystore with missing password
+        (keystores_dir / "keystore3.json").write_text(json.dumps(original_keystore))
+        # No password file for keystore3
+
+        storage = KeyStorage()
+        success, failures = load_input_only_keystores(keystores_dir, passwords_dir, storage)
+
+        assert success == 1  # Only keystore1 succeeds
+        assert failures == 2  # keystore2 (bad password) + keystore3 (missing password)
+        assert len(storage) == 1
+
+    def test_empty_directories(self, tmp_path: Path) -> None:
+        """Test loading from empty directories."""
+        keystores_dir = tmp_path / "keystores"
+        passwords_dir = tmp_path / "passwords"
+        keystores_dir.mkdir()
+        passwords_dir.mkdir()
+
+        storage = KeyStorage()
+        success, failures = load_input_only_keystores(keystores_dir, passwords_dir, storage)
+
+        assert success == 0
+        assert failures == 0
+        assert len(storage) == 0

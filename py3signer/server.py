@@ -6,7 +6,7 @@ import ssl
 
 from aiohttp import web
 
-from .bulk_loader import load_keystores_from_directory
+from .bulk_loader import load_input_only_keystores, load_keystores_from_directory
 from .config import Config
 from .handlers import APIHandler, setup_routes
 from .metrics import MetricsServer, setup_metrics_middleware
@@ -27,12 +27,21 @@ def create_app(config: Config) -> web.Application:
     signer = Signer(storage)
     handler = APIHandler(storage, signer, auth_token=config.auth_token)
 
-    # Load keystores from directory if configured
+    # Load keystores from key_store_path if configured (persistent keystores)
     if config.key_store_path:
         success, failures = load_keystores_from_directory(config.key_store_path, storage)
         logger.info(f"Loaded {success} keystores from {config.key_store_path}")
         if failures > 0:
             logger.warning(f"Failed to load {failures} keystores")
+
+    # Load input-only keystores from separate directories if configured
+    if config.keystores_path and config.keystores_passwords_path:
+        success, failures = load_input_only_keystores(
+            config.keystores_path, config.keystores_passwords_path, storage
+        )
+        logger.info(f"Loaded {success} input-only keystores from {config.keystores_path}")
+        if failures > 0:
+            logger.warning(f"Failed to load {failures} input-only keystores")
 
     # Create app
     app = web.Application()

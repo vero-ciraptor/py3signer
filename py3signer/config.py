@@ -30,6 +30,10 @@ class Config(msgspec.Struct, frozen=True):
     # Keystore settings
     key_store_path: Path | None = None
 
+    # Input-only keystore directories (not persisted)
+    keystores_path: Path | None = None
+    keystores_passwords_path: Path | None = None
+
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
         # msgspec handles basic type validation, but we need custom validation
@@ -62,6 +66,32 @@ class Config(msgspec.Struct, frozen=True):
                 raise ValueError(f"key_store_path does not exist: {self.key_store_path}")
             if not self.key_store_path.is_dir():
                 raise ValueError(f"key_store_path must be a directory: {self.key_store_path}")
+
+        # Validate input-only keystore paths
+        if self.keystores_path is not None and self.keystores_passwords_path is None:
+            raise ValueError(
+                "--keystores-passwords-path must be provided when --keystores-path is set"
+            )
+        if self.keystores_passwords_path is not None and self.keystores_path is None:
+            raise ValueError(
+                "--keystores-path must be provided when --keystores-passwords-path is set"
+            )
+
+        if self.keystores_path is not None:
+            if not self.keystores_path.exists():
+                raise ValueError(f"keystores_path does not exist: {self.keystores_path}")
+            if not self.keystores_path.is_dir():
+                raise ValueError(f"keystores_path must be a directory: {self.keystores_path}")
+
+        if self.keystores_passwords_path is not None:
+            if not self.keystores_passwords_path.exists():
+                raise ValueError(
+                    f"keystores_passwords_path does not exist: {self.keystores_passwords_path}"
+                )
+            if not self.keystores_passwords_path.is_dir():
+                raise ValueError(
+                    f"keystores_passwords_path must be a directory: {self.keystores_passwords_path}"
+                )
 
     @property
     def normalized_log_level(self) -> str:
@@ -107,6 +137,18 @@ def get_config() -> Config:
         default=None,
         help="Path to directory containing keystores (matching .json files with .txt password files)",
     )
+    parser.add_argument(
+        "--keystores-path",
+        type=Path,
+        default=None,
+        help="Path to directory containing input-only keystore .json files (not persisted)",
+    )
+    parser.add_argument(
+        "--keystores-passwords-path",
+        type=Path,
+        default=None,
+        help="Path to directory containing input-only password .txt files (not persisted)",
+    )
 
     args = parser.parse_args()
 
@@ -121,6 +163,8 @@ def get_config() -> Config:
         "metrics_port": args.metrics_port,
         "metrics_host": args.metrics_host,
         "key_store_path": args.key_store_path,
+        "keystores_path": args.keystores_path,
+        "keystores_passwords_path": args.keystores_passwords_path,
     }
 
     # Create config from dict using msgspec convert
