@@ -19,21 +19,6 @@ class SignerError(Exception):
 class Signer:
     """Handles BLS signing operations."""
     
-    # Standard Ethereum 2.0 domains (kept for reference)
-    DOMAINS: dict[str, bytes] = {
-        "beacon_proposer": bytes.fromhex("00000000"),
-        "beacon_attester": bytes.fromhex("01000000"),
-        "randao": bytes.fromhex("02000000"),
-        "deposit": bytes.fromhex("03000000"),
-        "voluntary_exit": bytes.fromhex("04000000"),
-        "selection_proof": bytes.fromhex("05000000"),
-        "aggregate_and_proof": bytes.fromhex("06000000"),
-        "sync_committee": bytes.fromhex("07000000"),
-        "sync_committee_selection_proof": bytes.fromhex("08000000"),
-        "contribution_and_proof": bytes.fromhex("09000000"),
-        "application_mask": bytes.fromhex("0a000000"),
-    }
-    
     def __init__(self, storage: KeyStorage) -> None:
         self._storage = storage
         self._logger = logging.getLogger(__name__)
