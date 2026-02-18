@@ -51,10 +51,12 @@ class KeyStorage:
         if self._keystore_path is None:
             return False
 
-        try:
-            keystore_file, password_file = self._get_file_paths(pubkey_hex)
-            self._keystore_path.mkdir(parents=True, exist_ok=True)
+        keystore_file, password_file = self._get_file_paths(pubkey_hex)
+        self._keystore_path.mkdir(parents=True, exist_ok=True)
 
+        keystore_temp = password_temp = None
+
+        try:
             # Atomic writes using temp files
             with tempfile.NamedTemporaryFile(
                 mode="w", dir=self._keystore_path, suffix=".tmp", delete=False
@@ -77,13 +79,12 @@ class KeyStorage:
         except Exception as e:
             logger.warning(f"Failed to save keystore to disk: {e}")
             # Cleanup temp files
-            for temp in ("keystore_temp", "password_temp"):
-                try:
-                    path = locals().get(temp)
-                    if path and os.path.exists(path):
-                        os.unlink(path)
-                except Exception:
-                    pass
+            for temp in (keystore_temp, password_temp):
+                if temp:
+                    try:
+                        os.unlink(temp)
+                    except OSError:
+                        pass
             return False
 
     def _delete_from_disk(self, pubkey_hex: str) -> bool:
@@ -118,8 +119,7 @@ class KeyStorage:
         Returns:
             Tuple of (pubkey_hex, persisted) where persisted indicates if disk write occurred.
         """
-        pubkey_bytes = pubkey.to_bytes()
-        pubkey_hex = pubkey_bytes.hex()
+        pubkey_hex = pubkey.to_bytes().hex()
 
         if pubkey_hex in self._keys:
             raise ValueError(f"Key already exists: {pubkey_hex}")
