@@ -7,7 +7,7 @@ import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
 from py3signer import metrics
-from py3signer.metrics_server import MetricsServer, create_metrics_app
+from py3signer.metrics import MetricsServer, create_metrics_app
 from py3signer.storage import KeyStorage
 
 
@@ -126,16 +126,12 @@ async def test_metrics_server_context_manager() -> None:
 
 def test_metrics_content_type() -> None:
     """Test metrics content type helper."""
-    from py3signer.metrics import get_metrics_content_type
-
-    content_type = get_metrics_content_type()
+    content_type = metrics.get_metrics_content_type()
     assert "text/plain" in content_type
 
 
 def test_metrics_output() -> None:
     """Test metrics output generation."""
-    from py3signer.metrics import get_metrics_output
-
-    output = get_metrics_output()
+    output = metrics.get_metrics_output()
     assert isinstance(output, bytes)
     assert b"py3signer_build_info" in output

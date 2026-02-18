@@ -9,8 +9,7 @@ from aiohttp import web
 from .bulk_loader import load_keystores_from_directory
 from .config import Config
 from .handlers import APIHandler, setup_routes
-from .metrics_middleware import setup_metrics_middleware
-from .metrics_server import MetricsServer
+from .metrics import MetricsServer, setup_metrics_middleware
 from .signer import Signer
 from .storage import KeyStorage
 
