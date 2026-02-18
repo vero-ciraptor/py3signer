@@ -2,6 +2,7 @@
 
 import json
 import logging
+from typing import cast
 
 import msgspec
 from aiohttp import web
@@ -57,6 +58,10 @@ class APIHandler:
         self._storage = storage
         self._signer = signer
         self._auth_token = auth_token
+        # Check if persistence is enabled
+        self._persistence_enabled = storage.keystore_path is not None
+        if self._persistence_enabled:
+            logger.info(f"Keystore persistence enabled: {storage.keystore_path}")
 
     async def _check_auth(self, request: web.Request) -> bool:
         """Check if request is authenticated."""
@@ -125,13 +130,38 @@ class APIHandler:
                 keystore = Keystore.from_json(keystore_json)
                 secret_key = keystore.decrypt(password)
                 pubkey = secret_key.public_key()
+                pubkey_bytes = pubkey.to_bytes()
+                pubkey_hex = cast(str, pubkey_bytes.hex())
 
-                self._storage.add_key(
-                    pubkey=pubkey,
-                    secret_key=secret_key,
-                    path=keystore.path,
-                    description=keystore.description,
-                )
+                # Check if key already exists
+                if pubkey_hex in [k[0] for k in self._storage.list_keys()]:
+                    results.append(
+                        {
+                            "status": "duplicate",
+                            "message": f"Keystore already exists for pubkey {keystore.pubkey}",
+                        }
+                    )
+                    continue
+
+                # Add key with persistence if enabled
+                if self._persistence_enabled:
+                    _, persisted = self._storage.add_key_with_persistence(
+                        pubkey=pubkey,
+                        secret_key=secret_key,
+                        keystore_json=keystore_json,
+                        password=password,
+                        path=keystore.path,
+                        description=keystore.description,
+                    )
+                    if not persisted:
+                        logger.warning(f"Failed to persist keystore to disk: {pubkey_hex[:20]}...")
+                else:
+                    self._storage.add_key(
+                        pubkey=pubkey,
+                        secret_key=secret_key,
+                        path=keystore.path,
+                        description=keystore.description,
+                    )
 
                 results.append(
                     {
@@ -142,8 +172,6 @@ class APIHandler:
 
             except KeystoreError as e:
                 results.append({"status": "error", "message": str(e)})
-            except ValueError as e:
-                results.append({"status": "duplicate", "message": str(e)})
             except Exception as e:
                 logger.exception("Unexpected error importing keystore")
                 results.append({"status": "error", "message": f"Internal error: {str(e)}"})
@@ -181,7 +209,19 @@ class APIHandler:
             # Normalize pubkey
             pubkey_hex = pubkey_hex.lower().replace("0x", "")
 
-            if self._storage.remove_key(pubkey_hex):
+            # Remove with persistence if enabled
+            if self._persistence_enabled:
+                removed_from_memory, deleted_from_disk = self._storage.remove_key_with_persistence(
+                    pubkey_hex
+                )
+                if removed_from_memory and not deleted_from_disk:
+                    logger.warning(
+                        f"Failed to delete keystore files from disk: {pubkey_hex[:20]}..."
+                    )
+            else:
+                removed_from_memory = self._storage.remove_key(pubkey_hex)
+
+            if removed_from_memory:
                 results.append(
                     {
                         "status": "deleted",

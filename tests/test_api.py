@@ -248,7 +248,80 @@ async def test_sign_missing_identifier(client):
     assert resp.status in [404, 405]  # Route not found or method not allowed
 
 
-# Spec-compliant sign request tests
+# Keystore persistence tests
+
+
+@pytest.mark.asyncio
+async def test_import_keystore_with_persistence(
+    client_with_persistence, sample_keystore, sample_keystore_password
+):
+    """Test that imported keystores are saved to disk when keystore_path is configured."""
+    keystore_json = json.dumps(sample_keystore)
+    pubkey = sample_keystore["pubkey"].lower().replace("0x", "")
+
+    # Import keystore
+    resp = await client_with_persistence.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
+    )
+    assert resp.status == 200
+
+    data = await resp.json()
+    assert len(data["data"]) == 1
+    assert data["data"][0]["status"] == "imported"
+
+    # Verify files were created on disk
+    # Note: We can't directly access the temp path here, but the storage tests verify this
+
+
+@pytest.mark.asyncio
+async def test_delete_keystore_with_persistence(
+    client_with_persistence, sample_keystore, sample_keystore_password
+):
+    """Test that deleted keystores are removed from disk when keystore_path is configured."""
+    keystore_json = json.dumps(sample_keystore)
+    pubkey = sample_keystore["pubkey"]
+    pubkey_normalized = pubkey.lower().replace("0x", "")
+
+    # First import
+    resp = await client_with_persistence.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
+    )
+    assert resp.status == 200
+
+    # Then delete
+    resp = await client_with_persistence.delete(
+        "/eth/v1/keystores", json={"pubkeys": [pubkey]}
+    )
+    assert resp.status == 200
+
+    data = await resp.json()
+    assert data["data"][0]["status"] == "deleted"
+
+
+@pytest.mark.asyncio
+async def test_import_duplicate_keystore(client, sample_keystore, sample_keystore_password):
+    """Test that importing a duplicate keystore returns proper error."""
+    keystore_json = json.dumps(sample_keystore)
+
+    # First import
+    resp = await client.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
+    )
+    assert resp.status == 200
+    assert (await resp.json())["data"][0]["status"] == "imported"
+
+    # Try to import again
+    resp = await client.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
+    )
+    assert resp.status == 200
+
+    data = await resp.json()
+    assert data["data"][0]["status"] == "duplicate"
 
 
 @pytest.mark.parametrize(

@@ -19,6 +19,14 @@ def config() -> Config:
 
 
 @pytest.fixture
+def config_with_keystore_path(tmp_path) -> Config:
+    """Create a test configuration with a keystore path."""
+    keystore_path = tmp_path / "keystores"
+    keystore_path.mkdir()
+    return Config(host="127.0.0.1", port=8080, log_level="DEBUG", key_store_path=keystore_path)
+
+
+@pytest.fixture
 def storage() -> KeyStorage:
     """Create a fresh key storage."""
     storage = KeyStorage()
@@ -30,6 +38,17 @@ def storage() -> KeyStorage:
 async def client(config: Config):
     """Create a test client."""
     app = create_app(config)
+    server = TestServer(app)
+    client = TestClient(server)
+    await client.start_server()
+    yield client
+    await client.close()
+
+
+@pytest_asyncio.fixture
+async def client_with_persistence(config_with_keystore_path: Config):
+    """Create a test client with keystore persistence enabled."""
+    app = create_app(config_with_keystore_path)
     server = TestServer(app)
     client = TestClient(server)
     await client.start_server()

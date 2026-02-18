@@ -24,7 +24,7 @@ APP_KEY_SIGNER: web.AppKey[Signer] = web.AppKey("signer", Signer)
 def create_app(config: Config) -> web.Application:
     """Create and configure the aiohttp application."""
     # Create components
-    storage = KeyStorage()
+    storage = KeyStorage(keystore_path=config.key_store_path)
     signer = Signer(storage)
     handler = APIHandler(storage, signer, auth_token=config.auth_token)
 
