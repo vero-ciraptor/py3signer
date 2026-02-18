@@ -154,21 +154,6 @@ fn verify(
     }
 }
 
-/// Aggregate multiple signatures into one
-/// Note: Currently only supports single signature (returns it as-is)
-/// Full aggregation requires additional blst APIs
-#[pyfunction]
-fn aggregate(signatures: Vec<PySignature>) -> PyResult<PySignature> {
-    if signatures.is_empty() {
-        return Err(PyValueError::new_err("Cannot aggregate empty signature list"));
-    }
-    
-    // For now, just return the first signature
-    // TODO: Implement full BLS signature aggregation using blst::Signature::aggregate
-    // which requires different API usage
-    Ok(signatures.into_iter().next().unwrap())
-}
-
 /// Generate a random secret key (for testing)
 /// Uses rejection sampling to ensure a valid BLS scalar
 #[pyfunction]
@@ -346,7 +331,6 @@ fn py3signer_core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_class::<PySignature>()?;
     m.add_wrapped(wrap_pyfunction!(sign))?;
     m.add_wrapped(wrap_pyfunction!(verify))?;
-    m.add_wrapped(wrap_pyfunction!(aggregate))?;
     m.add_wrapped(wrap_pyfunction!(generate_random_key))?;
     m.add_wrapped(wrap_pyfunction!(decrypt_keystore))?;
     Ok(())
@@ -381,10 +365,4 @@ mod tests {
         assert!(result.is_err());
     }
     
-    #[test]
-    fn test_aggregate_empty() {
-        let sigs: Vec<PySignature> = vec![];
-        let result = aggregate(sigs);
-        assert!(result.is_err());
-    }
 }

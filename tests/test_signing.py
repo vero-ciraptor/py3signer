@@ -1,7 +1,7 @@
 """Tests for signing operations."""
 
 import pytest
-from py3signer_core import SecretKey, PublicKey, Signature, sign, verify, aggregate, generate_random_key
+from py3signer_core import SecretKey, PublicKey, Signature, sign, verify, generate_random_key
 
 from py3signer.storage import KeyStorage
 from py3signer.signer import Signer, SignerError
@@ -112,31 +112,6 @@ class TestCryptoCore:
         sig2 = Signature.from_bytes(sig_bytes)
         assert sig1.to_bytes().hex() == sig2.to_bytes().hex()
     
-    def test_aggregate_signatures(self) -> None:
-        """Test signature aggregation."""
-        sk1 = generate_random_key()
-        sk2 = generate_random_key()
-        
-        message = b"test message"
-        domain = b"\x00\x00\x00\x00"
-        
-        sig1 = sign(sk1, message, domain)
-        sig2 = sign(sk2, message, domain)
-        
-        # Aggregate signatures
-        aggregated = aggregate([sig1, sig2])
-        
-        # Aggregation should return a valid 96-byte signature
-        assert aggregated is not None
-        assert len(aggregated.to_bytes()) == 96
-    
-    def test_aggregate_empty(self) -> None:
-        """Test aggregation of empty list."""
-        with pytest.raises(Exception) as exc_info:
-            aggregate([])
-        assert "empty" in str(exc_info.value).lower()
-
-
 class TestSigner:
     """Tests for the Signer class."""
     
