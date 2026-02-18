@@ -256,7 +256,7 @@ class ProfilingAPIHandler:
 
         if message is None:
             raise _bad_request(
-                "signingRoot is required (SSZ signing root computation not yet implemented)"
+                "signing_root is required (SSZ signing root computation not yet implemented)"
             )
         # Include validation in domain_computation for now
         profile_times["domain_computation"] = (time.perf_counter() - phase_start) * 1_000_000

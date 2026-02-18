@@ -100,7 +100,7 @@ class TestSignRequestParsing:
                 },
                 "genesis_validators_root": "0x0000000000000000000000000000000000000000000000000000000000000000"
             },
-            "signingRoot": "0xabcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234",
+            "signing_root": "0xabcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234",
             "attestation": {
                 "slot": "123",
                 "index": "0",
@@ -127,7 +127,7 @@ class TestSignRequestParsing:
                 },
                 "genesis_validators_root": "0x0000000000000000000000000000000000000000000000000000000000000000"
             },
-            "signingRoot": "0xabcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234",
+            "signing_root": "0xabcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234",
             "randao_reveal": {
                 "epoch": "100"
             }
@@ -149,7 +149,7 @@ class TestSignRequestParsing:
                 },
                 "genesis_validators_root": "0x0000000000000000000000000000000000000000000000000000000000000000"
             },
-            "signingRoot": "0xabcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234",
+            "signing_root": "0xabcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234",
             "voluntary_exit": {
                 "epoch": "100",
                 "validator_index": "5"
@@ -173,7 +173,7 @@ class TestSignRequestParsing:
                 },
                 "genesis_validators_root": "0x0000000000000000000000000000000000000000000000000000000000000000"
             },
-            "signingRoot": "0xabcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234",
+            "signing_root": "0xabcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234",
             "beacon_block": {
                 "version": "phase0",
                 "block": {
@@ -191,7 +191,7 @@ class TestSignRequestParsing:
         assert request.beacon_block["version"] == "phase0"
 
     def test_parse_without_signing_root(self) -> None:
-        """Test parsing a request without signingRoot (optional field)."""
+        """Test parsing a request without signing_root (optional field)."""
         json_data = b"""{
             "type": "ATTESTATION",
             "fork_info": {
@@ -236,7 +236,7 @@ class TestSignRequestParsing:
         """Test parsing a request without fork_info fails."""
         json_data = b"""{
             "type": "ATTESTATION",
-            "signingRoot": "0xabcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234",
+            "signing_root": "0xabcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234abcd1234",
             "attestation": {
                 "slot": "123",
                 "index": "0",
@@ -379,7 +379,7 @@ class TestGetDomainForRequest:
         assert get_domain_for_request(request) == DOMAIN_APPLICATION_MASK
 
 
-class TestValidateSigningRoot:
+class TestValidatesigning_root:
     """Tests for validate_signing_root function."""
 
     def test_valid_signing_root_with_prefix(self) -> None:
@@ -437,7 +437,7 @@ class TestAllSigningTypes:
                 "fork": {"previous_version": "0x0", "current_version": "0x0", "epoch": "0"},
                 "genesis_validators_root": "0x0",
             },
-            "signingRoot": "0x" + "00" * 32,
+            "signing_root": "0x" + "00" * 32,
         }
 
         # Add type-specific required fields

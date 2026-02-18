@@ -240,13 +240,13 @@ class APIHandler:
             raise _bad_request(str(e))
 
         if message is None:
-            # Per the Ethereum Remote Signing API spec, signingRoot is technically optional
+            # Per the Ethereum Remote Signing API spec, signing_root is technically optional
             # and the server should compute the signing root from the data if not provided.
             # However, SSZ signing root computation is not yet implemented.
-            # The validator client should provide signingRoot for now.
+            # The validator client should provide signing_root for now.
             raise _bad_request(
-                "signingRoot is required - SSZ signing root computation from request data "
-                "is not yet implemented. Please provide signingRoot in the request."
+                "signing_root is required - SSZ signing root computation from request data "
+                "is not yet implemented. Please provide signing_root in the request."
             )
 
         try:

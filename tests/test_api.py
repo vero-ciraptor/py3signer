@@ -354,17 +354,17 @@ async def test_import_duplicate_keystore(
         ({"type": "INVALID_TYPE"}, "Validation error"),
         # Missing fork_info
         ({"type": "ATTESTATION"}, "missing required field"),
-        # Invalid signingRoot length
+        # Invalid signing_root length
         (
             {
                 "type": "ATTESTATION",
-                "signingRoot": "0xabcd",
+                "signing_root": "0xabcd",
                 "fork_info": {
                     "fork": {"previous_version": "0x00", "current_version": "0x00", "epoch": "0"},
                     "genesis_validators_root": "0x00" * 32,
                 },
             },
-            "signingRoot",
+            "signing_root",
         ),
     ],
 )
@@ -399,7 +399,7 @@ async def test_sign_key_not_found(
         json={
             "type": "ATTESTATION",
             "fork_info": valid_fork_info,
-            "signingRoot": "abcd1234" * 8,  # 64 hex chars = 32 bytes
+            "signing_root": "abcd1234" * 8,  # 64 hex chars = 32 bytes
             "attestation": {
                 "slot": "123",
                 "index": "0",
@@ -416,7 +416,7 @@ async def test_sign_key_not_found(
 async def test_sign_missing_signing_root(
     client: TestClient[Any, Any], valid_fork_info: dict[str, Any]
 ) -> None:
-    """Test signing without signingRoot - returns error since SSZ computation is not implemented."""
+    """Test signing without signing_root - returns error since SSZ computation is not implemented."""
     pubkey = "a" * 96
     resp = await client.post(
         f"/api/v1/eth2/sign/{pubkey}",
@@ -435,7 +435,7 @@ async def test_sign_missing_signing_root(
     assert resp.status == 400
 
     data = await resp.json()
-    assert "signingRoot is required" in data["error"]
+    assert "signing_root is required" in data["error"]
 
 
 @pytest.mark.asyncio
@@ -461,7 +461,7 @@ async def test_sign_attestation(
         json={
             "type": "ATTESTATION",
             "fork_info": valid_fork_info,
-            "signingRoot": "0x" + "00" * 32,
+            "signing_root": "0x" + "00" * 32,
             "attestation": {
                 "slot": "123",
                 "index": "0",
@@ -502,7 +502,7 @@ async def test_sign_randao(
         json={
             "type": "RANDAO_REVEAL",
             "fork_info": valid_fork_info,
-            "signingRoot": "0x" + "00" * 32,
+            "signing_root": "0x" + "00" * 32,
             "randao_reveal": {"epoch": "100"},
         },
     )
@@ -535,7 +535,7 @@ async def test_sign_voluntary_exit(
         json={
             "type": "VOLUNTARY_EXIT",
             "fork_info": valid_fork_info,
-            "signingRoot": "0x" + "00" * 32,
+            "signing_root": "0x" + "00" * 32,
             "voluntary_exit": {"epoch": "100", "validator_index": "5"},
         },
     )
@@ -568,7 +568,7 @@ async def test_sign_block_v2(
         json={
             "type": "BLOCK_V2",
             "fork_info": valid_fork_info,
-            "signingRoot": "0x" + "00" * 32,
+            "signing_root": "0x" + "00" * 32,
             "beacon_block": {
                 "version": "phase0",
                 "block": {
@@ -618,7 +618,7 @@ async def test_full_flow(
         json={
             "type": "ATTESTATION",
             "fork_info": valid_fork_info,
-            "signingRoot": "0x" + "00" * 32,
+            "signing_root": "0x" + "00" * 32,
             "attestation": {
                 "slot": "123",
                 "index": "0",

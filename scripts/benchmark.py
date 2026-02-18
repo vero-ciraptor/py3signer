@@ -380,7 +380,7 @@ def create_signing_request() -> dict[str, Any]:
     return {
         "type": "ATTESTATION",
         "fork_info": FORK_INFO,
-        "signingRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "signing_root": "0x0000000000000000000000000000000000000000000000000000000000000000",
         "attestation": {
             "slot": "123",
             "index": "0",

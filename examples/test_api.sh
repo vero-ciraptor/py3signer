@@ -38,7 +38,7 @@ if [ -f "examples/sample_keystore.json" ]; then
     curl -s -X POST "$BASE_URL/api/v1/eth2/sign/$PUBKEY" \
         -H "Content-Type: application/json" \
         -d '{
-            "signingRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            "signing_root": "0x0000000000000000000000000000000000000000000000000000000000000000",
             "domain_name": "beacon_attester"
         }' | python -m json.tool
     echo ""

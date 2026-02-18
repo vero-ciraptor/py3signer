@@ -227,7 +227,7 @@ def create_signing_request() -> dict[str, Any]:
     return {
         "type": "ATTESTATION",
         "fork_info": FORK_INFO,
-        "signingRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "signing_root": "0x0000000000000000000000000000000000000000000000000000000000000000",
         "attestation": {
             "slot": "123",
             "index": "0",
@@ -646,7 +646,7 @@ class ProfilingAPIHandler:
 
         if message is None:
             raise _bad_request(
-                "signingRoot is required (SSZ signing root computation not yet implemented)"
+                "signing_root is required (SSZ signing root computation not yet implemented)"
             )
         # Include validation in domain_computation for now
         profile_times["domain_computation"] = (time.perf_counter() - phase_start) * 1_000_000

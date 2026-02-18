@@ -216,7 +216,7 @@ Response:
 curl -X POST http://localhost:8080/api/v1/eth2/sign/a99a76ed... \
   -H "Content-Type: application/json" \
   -d '{
-    "signingRoot": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "signing_root": "0x0000000000000000000000000000000000000000000000000000000000000000",
     "domain_name": "beacon_attester"
   }'
 ```
@@ -249,7 +249,7 @@ You can also specify a custom domain as 4 hex bytes:
 curl -X POST http://localhost:8080/api/v1/eth2/sign/a99a76ed... \
   -H "Content-Type: application/json" \
   -d '{
-    "signingRoot": "0x...",
+    "signing_root": "0x...",
     "domain": "0x01000000"
   }'
 ```

@@ -317,7 +317,7 @@ def get_domain_for_request(request: SignRequest) -> bytes:
 
     This maps the signing type to its corresponding 4-byte domain.
     Domain computation from fork_info is not yet implemented;
-    callers must provide signingRoot for now.
+    callers must provide signing_root for now.
 
     Args:
         request: The signing request
@@ -369,8 +369,8 @@ def validate_signing_root(signing_root: str | None) -> bytes | None:
 
     signing_root_clean = signing_root.replace("0x", "")
     if len(signing_root_clean) != 64:
-        raise ValueError("signingRoot must be 32 bytes (64 hex characters)")
+        raise ValueError("signing_root must be 32 bytes (64 hex characters)")
     try:
         return bytes.fromhex(signing_root_clean)
     except ValueError as e:
-        raise ValueError(f"signingRoot must be valid hexadecimal: {e}")
+        raise ValueError(f"signing_root must be valid hexadecimal: {e}")
