@@ -7,7 +7,8 @@ import msgspec
 import pytest
 
 from py3signer.bulk_loader import (
-    load_input_only_keystores,
+    import_keystores_from_directory,
+    import_keystores_from_separate_directories,
     load_keystore_with_password,
     load_keystores_from_directory,
     scan_keystore_directory,
@@ -91,7 +92,7 @@ class TestLoadKeystoreWithPassword:
         password_path = tmp_path / "password.txt"
         password_path.write_text("testpassword123")
 
-        pubkey, secret_key, path, description = load_keystore_with_password(
+        pubkey, secret_key, path, description, password = load_keystore_with_password(
             keystore_path,
             password_path,
         )
@@ -100,6 +101,7 @@ class TestLoadKeystoreWithPassword:
         assert secret_key is not None
         assert path == "m/12381/3600/0/0/0"
         assert description == "Test keystore with scrypt KDF (N=262144)"
+        assert password == "testpassword123"
 
     def test_wrong_password(self, tmp_path: Path) -> None:
         """Test loading with incorrect password."""
@@ -279,17 +281,25 @@ class TestBulkLoaderIntegration:
         assert len(keystores) == 3
 
 
-class TestLoadKeystoresPersistentParameter:
-    """Tests for the persistent parameter in load_keystores_from_directory."""
+class TestImportKeystoresFromDirectory:
+    """Tests for importing keystores to unified storage."""
 
-    def test_load_as_non_persistent(self, tmp_path: Path) -> None:
-        """Test loading keystores as non-persistent."""
+    def test_import_copies_to_unified_storage(self, tmp_path: Path) -> None:
+        """Test that import copies keystore files to unified storage."""
         test_data = Path(__file__).parent / "data"
 
-        # Create a valid keystore with unique pubkey
-        keystore_json = tmp_path / "keystore-m_12381_3600_0_0_0-16777216.json"
-        keystore_txt = tmp_path / "keystore-m_12381_3600_0_0_0-16777216.txt"
+        # Create data_dir for storage
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        storage = KeyStorage(data_dir=data_dir)
 
+        # Create source directory with keystore files
+        source_dir = tmp_path / "source"
+        source_dir.mkdir()
+
+        # Create a valid keystore with unique pubkey
+        keystore_json = source_dir / "keystore.json"
+        keystore_txt = source_dir / "keystore.txt"
         keystore_data = json.loads(
             (test_data / "test_keystore_scrypt.json").read_text(),
         )
@@ -299,29 +309,44 @@ class TestLoadKeystoresPersistentParameter:
         keystore_json.write_text(json.dumps(keystore_data))
         keystore_txt.write_text("testpassword123")
 
-        storage = KeyStorage()
-        success, failures = load_keystores_from_directory(
-            tmp_path,
-            storage,
-            persistent=False,
-        )
+        # Import to storage
+        success, failures = import_keystores_from_directory(source_dir, storage)
 
         assert success == 1
         assert failures == 0
         assert len(storage) == 1
 
-        # Verify the key is marked as non-persistent by checking remove behavior
-        # (non-persistent keys should not trigger disk deletion)
+        # Verify files were copied to unified storage
+        keystores_dir = data_dir / "keystores"
         pubkey_hex = "97248533cef0908a5ebe52c3b487471301bf6369010e6167f63dd74feddac2dfb5336a59a331d38eb0e454d6f6fcb1a4"
-        storage.remove_key(pubkey_hex)
+        assert (keystores_dir / f"{pubkey_hex}.json").exists()
+        assert (keystores_dir / f"{pubkey_hex}.txt").exists()
+
+    def test_import_nonexistent_source(self, tmp_path: Path) -> None:
+        """Test import from nonexistent source directory."""
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        storage = KeyStorage(data_dir=data_dir)
+
+        source_dir = tmp_path / "nonexistent"
+
+        with pytest.raises(
+            ValueError, match=f"Source directory does not exist: {source_dir}"
+        ):
+            import_keystores_from_directory(source_dir, storage)
 
 
-class TestLoadInputOnlyKeystores:
-    """Tests for load_input_only_keystores function."""
+class TestImportKeystoresFromSeparateDirectories:
+    """Tests for import_keystores_from_separate_directories function."""
 
-    def test_load_from_separate_directories(self, tmp_path: Path) -> None:
-        """Test loading keystores from separate directories."""
+    def test_import_from_separate_directories(self, tmp_path: Path) -> None:
+        """Test importing keystores from separate directories."""
         test_data = Path(__file__).parent / "data"
+
+        # Create data_dir for storage
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        storage = KeyStorage(data_dir=data_dir)
 
         keystores_dir = tmp_path / "keystores"
         passwords_dir = tmp_path / "passwords"
@@ -342,8 +367,8 @@ class TestLoadInputOnlyKeystores:
         password_txt = passwords_dir / "test_keystore.txt"
         password_txt.write_text("testpassword123")
 
-        storage = KeyStorage()
-        success, failures = load_input_only_keystores(
+        # Import to unified storage
+        success, failures = import_keystores_from_separate_directories(
             keystores_dir,
             passwords_dir,
             storage,
@@ -353,9 +378,15 @@ class TestLoadInputOnlyKeystores:
         assert failures == 0
         assert len(storage) == 1
 
-        # Verify key is non-persistent
+        # Verify files were copied to unified storage
+        keystores_dir_unified = data_dir / "keystores"
         pubkey_hex = "97248533cef0908a5ebe52c3b487471301bf6369010e6167f63dd74feddac2dfb5336a59a331d38eb0e454d6f6fcb1a4"
+        assert (keystores_dir_unified / f"{pubkey_hex}.json").exists()
+        assert (keystores_dir_unified / f"{pubkey_hex}.txt").exists()
+
+        # Key should be deletable (no persistent flag distinction)
         storage.remove_key(pubkey_hex)
+        assert len(storage) == 0
 
     def test_missing_password_file(self, tmp_path: Path) -> None:
         """Test handling when password file is missing in separate directory."""
@@ -368,8 +399,11 @@ class TestLoadInputOnlyKeystores:
         keystore_json = keystores_dir / "test_keystore.json"
         keystore_json.write_text('{"version": 4}')
 
-        storage = KeyStorage()
-        success, failures = load_input_only_keystores(
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        storage = KeyStorage(data_dir=data_dir)
+
+        success, failures = import_keystores_from_separate_directories(
             keystores_dir,
             passwords_dir,
             storage,
@@ -385,10 +419,15 @@ class TestLoadInputOnlyKeystores:
         passwords_dir = tmp_path / "passwords"
         passwords_dir.mkdir()
 
-        storage = KeyStorage()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        storage = KeyStorage(data_dir=data_dir)
+
         expected_msg = f"Keystores path does not exist: {keystores_dir}"
         with pytest.raises(ValueError, match=expected_msg):
-            load_input_only_keystores(keystores_dir, passwords_dir, storage)
+            import_keystores_from_separate_directories(
+                keystores_dir, passwords_dir, storage
+            )
 
     def test_nonexistent_passwords_path(self, tmp_path: Path) -> None:
         """Test error when passwords path doesn't exist."""
@@ -396,10 +435,15 @@ class TestLoadInputOnlyKeystores:
         passwords_dir = tmp_path / "passwords"
         keystores_dir.mkdir()
 
-        storage = KeyStorage()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        storage = KeyStorage(data_dir=data_dir)
+
         expected_msg = f"Passwords path does not exist: {passwords_dir}"
         with pytest.raises(ValueError, match=expected_msg):
-            load_input_only_keystores(keystores_dir, passwords_dir, storage)
+            import_keystores_from_separate_directories(
+                keystores_dir, passwords_dir, storage
+            )
 
     def test_keystores_path_is_file(self, tmp_path: Path) -> None:
         """Test error when keystores path is a file."""
@@ -408,10 +452,15 @@ class TestLoadInputOnlyKeystores:
         keystores_file.write_text("not a directory")
         passwords_dir.mkdir()
 
-        storage = KeyStorage()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        storage = KeyStorage(data_dir=data_dir)
+
         expected_msg = f"Keystores path is not a directory: {keystores_file}"
         with pytest.raises(ValueError, match=expected_msg):
-            load_input_only_keystores(keystores_file, passwords_dir, storage)
+            import_keystores_from_separate_directories(
+                keystores_file, passwords_dir, storage
+            )
 
     def test_passwords_path_is_file(self, tmp_path: Path) -> None:
         """Test error when passwords path is a file."""
@@ -420,10 +469,15 @@ class TestLoadInputOnlyKeystores:
         keystores_dir.mkdir()
         passwords_file.write_text("not a directory")
 
-        storage = KeyStorage()
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        storage = KeyStorage(data_dir=data_dir)
+
         expected_msg = f"Passwords path is not a directory: {passwords_file}"
         with pytest.raises(ValueError, match=expected_msg):
-            load_input_only_keystores(keystores_dir, passwords_file, storage)
+            import_keystores_from_separate_directories(
+                keystores_dir, passwords_file, storage
+            )
 
     def test_multiple_keystores_with_mixed_success(self, tmp_path: Path) -> None:
         """Test loading multiple keystores with some failures."""
@@ -436,6 +490,10 @@ class TestLoadInputOnlyKeystores:
         passwords_dir = tmp_path / "passwords"
         keystores_dir.mkdir()
         passwords_dir.mkdir()
+
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        storage = KeyStorage(data_dir=data_dir)
 
         # Valid keystore 1 - use the original with its actual pubkey
         keystore1_json = keystores_dir / "keystore1.json"
@@ -453,8 +511,7 @@ class TestLoadInputOnlyKeystores:
         (keystores_dir / "keystore3.json").write_text(json.dumps(original_keystore))
         # No password file for keystore3
 
-        storage = KeyStorage()
-        success, failures = load_input_only_keystores(
+        success, failures = import_keystores_from_separate_directories(
             keystores_dir,
             passwords_dir,
             storage,
@@ -471,8 +528,11 @@ class TestLoadInputOnlyKeystores:
         keystores_dir.mkdir()
         passwords_dir.mkdir()
 
-        storage = KeyStorage()
-        success, failures = load_input_only_keystores(
+        data_dir = tmp_path / "data"
+        data_dir.mkdir()
+        storage = KeyStorage(data_dir=data_dir)
+
+        success, failures = import_keystores_from_separate_directories(
             keystores_dir,
             passwords_dir,
             storage,

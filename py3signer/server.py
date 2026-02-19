@@ -10,7 +10,10 @@ from granian.constants import Interfaces
 from litestar import Litestar
 from litestar.datastructures import State
 
-from .bulk_loader import load_input_only_keystores, load_keystores_from_directory
+from .bulk_loader import (
+    import_keystores_from_separate_directories,
+    load_keystores_from_directory,
+)
 from .handlers import get_routers
 from .metrics import MetricsServer
 from .signer import Signer
@@ -32,31 +35,52 @@ def create_app(
     """Create and configure the Litestar application."""
     # If config is provided but storage/signer are not, create them
     if config is not None and (storage is None or signer is None):
-        storage = KeyStorage(keystore_path=config.data_dir)
+        storage = KeyStorage(data_dir=config.data_dir)
         signer = Signer(storage)
 
-        # Load keystores from data_dir if configured (persistent keystores)
+        # Load keystores from unified storage (data_dir/keystores)
         if config.data_dir:
-            success, failures = load_keystores_from_directory(
-                config.data_dir,
-                storage,
-            )
-            logger.info(f"Loaded {success} keystores from {config.data_dir}")
-            if failures > 0:
-                logger.warning(f"Failed to load {failures} keystores")
+            keystores_dir = config.data_dir / "keystores"
+            if keystores_dir.exists():
+                success, failures = load_keystores_from_directory(
+                    keystores_dir,
+                    storage,
+                )
+                logger.info(f"Loaded {success} keystores from {keystores_dir}")
+                if failures > 0:
+                    logger.warning(f"Failed to load {failures} keystores")
+            else:
+                logger.info(f"Keystores directory does not exist yet: {keystores_dir}")
 
-        # Load input-only keystores from separate directories if configured
+        # Import keystores from --keystores-path (if provided)
+        # These are imported (copied) to the unified storage location
         if config.keystores_path and config.keystores_passwords_path:
-            success, failures = load_input_only_keystores(
-                config.keystores_path,
-                config.keystores_passwords_path,
-                storage,
-            )
-            logger.info(
-                f"Loaded {success} input-only keystores from {config.keystores_path}",
-            )
-            if failures > 0:
-                logger.warning(f"Failed to load {failures} input-only keystores")
+            # If data_dir is set, import to unified storage
+            if config.data_dir:
+                logger.info(
+                    f"Importing keystores from {config.keystores_path} "
+                    f"to unified storage at {config.data_dir / 'keystores'}"
+                )
+                success, failures = import_keystores_from_separate_directories(
+                    config.keystores_path,
+                    config.keystores_passwords_path,
+                    storage,
+                )
+                logger.info(f"Imported {success} keystores from external path")
+                if failures > 0:
+                    logger.warning(f"Failed to import {failures} keystores")
+            else:
+                # No data_dir - load without persistence (backward compatibility)
+                logger.warning(
+                    "No --data-dir configured, loading keystores without persistence"
+                )
+                success, failures = load_keystores_from_directory(
+                    config.keystores_path,
+                    storage,
+                )
+                logger.info(f"Loaded {success} keystores (no persistence)")
+                if failures > 0:
+                    logger.warning(f"Failed to load {failures} keystores")
 
     # Fallback for when storage/signer are passed directly (e.g., tests)
     if storage is None:

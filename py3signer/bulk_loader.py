@@ -57,7 +57,7 @@ def scan_keystore_directory(directory: Path) -> dict[str, Path]:
 def load_keystore_with_password(
     keystore_path: Path,
     password_path: Path,
-) -> tuple[PublicKey, SecretKey, str, str | None]:
+) -> tuple[PublicKey, SecretKey, str, str | None, str]:
     """Load a single keystore with its password.
 
     Args:
@@ -65,7 +65,7 @@ def load_keystore_with_password(
         password_path: Path to the password text file
 
     Returns:
-        Tuple of (public_key, secret_key, path, description)
+        Tuple of (public_key, secret_key, path, description, password)
 
     Raises:
         KeystoreError: If keystore is invalid or password is incorrect
@@ -84,13 +84,13 @@ def load_keystore_with_password(
     secret_key = keystore.decrypt(password)
     pubkey = secret_key.public_key()
 
-    return pubkey, secret_key, keystore.path, keystore.description
+    return pubkey, secret_key, keystore.path, keystore.description, password
 
 
 def load_keystores_from_directory(
     directory: Path,
     storage: KeyStorage,
-    persistent: bool = True,
+    import_to_storage: bool = False,
 ) -> tuple[int, int]:
     """Load all keystores from a directory into storage.
 
@@ -100,7 +100,7 @@ def load_keystores_from_directory(
     Args:
         directory: Path to directory containing keystore files
         storage: KeyStorage instance to load keys into
-        persistent: Whether keys should be marked as persistent (default: True)
+        import_to_storage: If True, copy keystore files to storage's keystores dir
 
     Returns:
         Tuple of (success_count, failure_count)
@@ -115,18 +115,32 @@ def load_keystores_from_directory(
         password_path = keystore_path.with_suffix(".txt")
 
         try:
-            pubkey, secret_key, path, description = load_keystore_with_password(
-                keystore_path,
-                password_path,
+            pubkey, secret_key, path, description, password = (
+                load_keystore_with_password(
+                    keystore_path,
+                    password_path,
+                )
             )
+            pubkey_hex = pubkey.to_bytes().hex()
+
+            # Read keystore JSON for persistence
+            keystore_json = keystore_path.read_text()
+
+            # Add key to storage (always persistent if data_dir is set)
             storage.add_key(
                 pubkey,
                 secret_key,
                 path,
                 description,
-                persistent=persistent,
+                keystore_json=keystore_json,
+                password=password,
             )
-            logger.info(f"Loaded keystore: {base_name} (persistent={persistent})")
+
+            # Optionally import (copy) the files to unified storage
+            if import_to_storage:
+                storage.import_keystore_files(directory, pubkey_hex)
+
+            logger.info(f"Loaded keystore: {base_name}")
             success_count += 1
         except KeystoreError as e:
             logger.error(f"Failed to load keystore {base_name}: {e}")
@@ -144,15 +158,45 @@ def load_keystores_from_directory(
     return success_count, failure_count
 
 
-def load_input_only_keystores(
+def import_keystores_from_directory(
+    source_dir: Path,
+    storage: KeyStorage,
+) -> tuple[int, int]:
+    """Import keystores from a source directory into unified storage.
+
+    This function loads keystores from a source directory and copies them
+    to the unified storage location (data_dir/keystores).
+
+    Args:
+        source_dir: Path to directory containing keystore .json and .txt files
+        storage: KeyStorage instance to load keys into
+
+    Returns:
+        Tuple of (success_count, failure_count)
+
+    Raises:
+        ValueError: If source_dir is not a valid directory
+
+    """
+    if not source_dir.exists():
+        raise ValueError(f"Source directory does not exist: {source_dir}")
+    if not source_dir.is_dir():
+        raise ValueError(f"Source path is not a directory: {source_dir}")
+
+    # Use the unified loading function with import enabled
+    return load_keystores_from_directory(source_dir, storage, import_to_storage=True)
+
+
+def import_keystores_from_separate_directories(
     keystores_path: Path,
     passwords_path: Path,
     storage: KeyStorage,
 ) -> tuple[int, int]:
-    """Load input-only keystores from separate directories.
+    """Import keystores from separate directories into unified storage.
 
     Scans the keystores directory for .json files and looks for matching
     .txt password files in the passwords directory (by base name).
+    Keys are imported (copied) to the unified storage location.
 
     Args:
         keystores_path: Path to directory containing keystore .json files
@@ -191,25 +235,47 @@ def load_input_only_keystores(
             continue
 
         try:
-            pubkey, secret_key, path, description = load_keystore_with_password(
-                json_file,
-                password_file,
+            pubkey, secret_key, path, description, password = (
+                load_keystore_with_password(
+                    json_file,
+                    password_file,
+                )
             )
-            # Mark as non-persistent (input-only)
-            storage.add_key(pubkey, secret_key, path, description, persistent=False)
-            logger.info(f"Loaded input-only keystore: {base_name}")
+            pubkey_hex = pubkey.to_bytes().hex()
+
+            # Read keystore JSON for persistence
+            keystore_json = json_file.read_text()
+
+            # Add key to storage
+            storage.add_key(
+                pubkey,
+                secret_key,
+                path,
+                description,
+                keystore_json=keystore_json,
+                password=password,
+            )
+
+            # Import the keystore files to unified storage
+            # Try to import from both locations (keystores_path takes precedence)
+            result = storage.import_keystore_files(keystores_path, pubkey_hex)
+            if result == (None, None):
+                # Try passwords_path as fallback (for files named by pubkey)
+                storage.import_keystore_files(passwords_path, pubkey_hex)
+
+            logger.info(f"Imported keystore: {base_name}")
             success_count += 1
         except KeystoreError as e:
-            logger.error(f"Failed to load keystore {base_name}: {e}")
+            logger.error(f"Failed to import keystore {base_name}: {e}")
             failure_count += 1
         except ValueError as e:
             logger.error(f"Failed to add keystore {base_name} to storage: {e}")
             failure_count += 1
         except Exception as e:
-            logger.error(f"Unexpected error loading keystore {base_name}: {e}")
+            logger.error(f"Unexpected error importing keystore {base_name}: {e}")
             failure_count += 1
 
     logger.info(
-        f"Input-only keystore loading complete: {success_count} succeeded, {failure_count} failed",
+        f"Import complete: {success_count} succeeded, {failure_count} failed",
     )
     return success_count, failure_count

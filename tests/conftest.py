@@ -43,6 +43,16 @@ def storage() -> Generator[KeyStorage]:
 
 
 @pytest.fixture
+def storage_with_data_dir(tmp_path: Path) -> Generator[KeyStorage]:
+    """Create a key storage with a data directory."""
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    storage = KeyStorage(data_dir=data_dir)
+    yield storage
+    storage.clear()
+
+
+@pytest.fixture
 async def client(config: Config) -> AsyncGenerator[AsyncTestClient]:
     """Create a test client."""
     app = create_app(config)
