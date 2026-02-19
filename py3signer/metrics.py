@@ -1,13 +1,13 @@
 """Prometheus metrics for py3signer with Litestar.
 
 This module defines and exposes all Prometheus metrics used by py3signer.
-Metrics are opt-in and only collected when --metrics-enabled is set.
 """
+
+from __future__ import annotations
 
 import logging
 import threading
-import time
-from typing import Any
+from http.server import HTTPServer
 
 from litestar import Controller, get
 from litestar.response import Response
@@ -91,34 +91,6 @@ def get_metrics_content_type() -> str:
     return CONTENT_TYPE_LATEST
 
 
-# Litestar middleware for tracking metrics
-
-
-class PrometheusMiddleware:
-    """Middleware to track HTTP request metrics."""
-
-    async def __call__(self, request: Any, handler: Any) -> Any:
-        """Process request and track metrics."""
-        start_time = time.perf_counter()
-        method = request.method
-        endpoint = request.url.path
-        status = "500"
-
-        try:
-            response = await handler(request)
-            status = str(response.status_code)
-            return response
-        except Exception as e:
-            # Try to get status from exception
-            if hasattr(e, "status_code"):
-                status = str(e.status_code)
-            raise
-        finally:
-            duration = time.perf_counter() - start_time
-            HTTP_REQUEST_DURATION_SECONDS.labels(method=method, endpoint=endpoint).observe(duration)
-            HTTP_REQUESTS_TOTAL.labels(method=method, endpoint=endpoint, status=status).inc()
-
-
 # Metrics HTTP controller
 
 
@@ -143,28 +115,29 @@ class MetricsController(Controller):  # type: ignore[misc]
 
 # Standalone metrics server for multi-process scenarios using threaded HTTP server
 
+
 class MetricsServer:
     """Standalone Prometheus metrics HTTP server using basic threaded HTTP server."""
 
     def __init__(self, host: str = "127.0.0.1", port: int = 8081) -> None:
         self._host = host
         self._port = port
-        self._server = None
-        self._thread = None
+        self._server: HTTPServer | None = None
+        self._thread: threading.Thread | None = None
         self._running = False
 
     async def start(self) -> None:
         """Start the metrics server in a background thread."""
-        from http.server import HTTPServer, BaseHTTPRequestHandler
+        from http.server import BaseHTTPRequestHandler, HTTPServer
 
         class MetricsHandler(BaseHTTPRequestHandler):
             """HTTP handler for metrics endpoint."""
 
-            def log_message(self, format, *args):
+            def log_message(self, format: str, *args: object) -> None:
                 # Suppress default logging
                 pass
 
-            def do_GET(self):
+            def do_GET(self) -> None:
                 if self.path == "/metrics":
                     self.send_response(200)
                     self.send_header("Content-Type", get_metrics_content_type())
@@ -179,10 +152,10 @@ class MetricsServer:
                     self.send_response(404)
                     self.end_headers()
 
-        def run_server():
+        def run_server() -> None:
             """Run the HTTP server."""
             self._server = HTTPServer((self._host, self._port), MetricsHandler)
-            logger.info(f"Metrics server running at http://self._host:self._port/metrics")
+            logger.info(f"Metrics server running at http://{self._host}:{self._port}/metrics")
             while self._running:
                 try:
                     self._server.handle_request()
@@ -192,7 +165,7 @@ class MetricsServer:
         self._running = True
         self._thread = threading.Thread(target=run_server, daemon=True)
         self._thread.start()
-        logger.info(f"Metrics server started at http://self._host:self._port/metrics")
+        logger.info("Metrics server started at http://self._host:self._port/metrics")
 
     async def stop(self) -> None:
         """Stop the metrics server."""

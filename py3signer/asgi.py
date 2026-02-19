@@ -7,9 +7,12 @@ Configuration is loaded from environment variables set by the main process.
 import json
 import logging
 import os
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 import msgspec
+from litestar import Litestar
 
 from .config import Config
 from .server import create_app
@@ -64,34 +67,33 @@ def store_config_in_env(config: Config) -> None:
 
 
 # Global app instance (created once per worker)
-_app_instance = None
+_app_instance: Litestar | None = None
 
 
-def get_app():
+def get_app() -> Litestar:
     """Get or create the Litestar app instance."""
     global _app_instance
     if _app_instance is None:
         config = load_config_from_env()
         if config is None:
             raise RuntimeError(
-                "Configuration not found. "
-                "Use 'python -m py3signer' to start the server properly."
+                "Configuration not found. Use 'python -m py3signer' to start the server properly."
             )
-        
+
         # Setup logging
         logging.basicConfig(
             level=getattr(logging, config.normalized_log_level),
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
-        
+
         _app_instance = create_app(config)
-    
+
     return _app_instance
 
 
 # ASGI application callable
 # Granian calls this with (scope, receive, send)
-async def app(scope, receive, send):
+async def app(scope: dict[str, Any], receive: Callable[..., Any], send: Callable[..., Any]) -> None:
     """ASGI application entry point."""
     litestar_app = get_app()
     await litestar_app(scope, receive, send)

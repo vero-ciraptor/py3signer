@@ -128,12 +128,6 @@ def get_config() -> Config:
     )
     parser.add_argument("--auth-token", default=None, help="Bearer token for API authentication")
     parser.add_argument(
-        "--metrics-enabled",
-        action="store_true",
-        default=False,
-        help="Enable Prometheus metrics endpoint (default: false)",
-    )
-    parser.add_argument(
         "--metrics-port", type=int, default=8081, help="Port for metrics server (default: 8081)"
     )
     parser.add_argument(
@@ -158,7 +152,8 @@ def get_config() -> Config:
         help="Path to directory containing input-only password .txt files (not persisted)",
     )
     parser.add_argument(
-        "-w", "--workers",
+        "-w",
+        "--workers",
         type=int,
         default=multiprocessing.cpu_count(),
         help=f"Number of worker processes (default: {multiprocessing.cpu_count()})",

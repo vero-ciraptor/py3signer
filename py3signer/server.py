@@ -83,19 +83,21 @@ async def run_server(config: Config) -> None:
 
     # Import asgi module to store config
     from . import asgi
+
     asgi.store_config_in_env(config)
 
     # Run with Granian ASGI using factory pattern for multi-worker support
     import multiprocessing
-    workers = getattr(config, 'workers', multiprocessing.cpu_count())
-    
+
+    workers = getattr(config, "workers", multiprocessing.cpu_count())
+
     # Build ssl_key and ssl_cert for Granian
     ssl_key = str(config.tls_key) if config.tls_key else None
     ssl_cert = str(config.tls_cert) if config.tls_cert else None
-    
+
     # Map py3signer log levels to Granian log levels
     granian_log_level = config.log_level.lower()
-    
+
     server = Granian(
         target="py3signer.asgi:app",
         address=config.host,
@@ -109,6 +111,7 @@ async def run_server(config: Config) -> None:
 
     # Start metrics server in the main process (not workers)
     from .metrics import MetricsServer
+
     metrics_server = MetricsServer(host=config.metrics_host, port=config.metrics_port)
     await metrics_server.start()
 
