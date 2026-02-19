@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from .metrics import KEYS_LOADED
 from .models import KeyInfo
 
 if TYPE_CHECKING:
@@ -55,6 +54,12 @@ class KeyStorage:
         self._data_dir = data_dir
         self._managed_keystores_dir = self._get_managed_keystores_dir(data_dir)
         self._external_keystores_path = external_keystores_path
+
+    def _update_keys_metric(self) -> None:
+        """Update the keys_loaded metric (lazily imported to ensure proper setup order)."""
+        from .metrics import KEYS_LOADED
+
+        KEYS_LOADED.set(len(self._keys))
 
     def _get_managed_keystores_dir(self, data_dir: Path | None) -> Path | None:
         """Get the managed keystores directory path.
@@ -249,7 +254,7 @@ class KeyStorage:
             description=description,
         )
         self._external_keys.add(pubkey_hex)
-        KEYS_LOADED.set(len(self._keys))
+        self._update_keys_metric()
         logger.info(f"Added external key: {pubkey_hex[:20]}...")
 
         return pubkey_hex
@@ -294,7 +299,7 @@ class KeyStorage:
             description=description,
         )
         self._managed_keys.add(pubkey_hex)
-        KEYS_LOADED.set(len(self._keys))
+        self._update_keys_metric()
         logger.info(f"Added managed key: {pubkey_hex[:20]}...")
 
         persisted_to_disk = False
@@ -356,7 +361,7 @@ class KeyStorage:
         if is_managed:
             self._managed_keys.discard(pubkey_hex)
 
-        KEYS_LOADED.set(len(self._keys))
+        self._update_keys_metric()
         logger.info(f"Removed key: {pubkey_hex[:20]}...")
 
         return is_external, is_managed
@@ -406,4 +411,4 @@ class KeyStorage:
         self._keys.clear()
         self._external_keys.clear()
         self._managed_keys.clear()
-        KEYS_LOADED.set(0)
+        self._update_keys_metric()
