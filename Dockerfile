@@ -1,4 +1,4 @@
-ARG PYTHON_IMAGE_TAG="3.13-slim-bookworm"
+ARG PYTHON_IMAGE_TAG="3.14-slim-bookworm"
 ARG RUST_IMAGE_TAG="1.93-bookworm"
 ARG UV_IMAGE_TAG="0.10"
 
