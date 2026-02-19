@@ -109,6 +109,7 @@ class KeystoreInfo(msgspec.Struct):
 
     validating_pubkey: str
     derivation_path: str
+    # readonly=True for external keys that shouldn't be modified via API
     readonly: bool = False
 
 
@@ -176,8 +177,12 @@ class LocalKeyManagerController(Controller):  # type: ignore[misc]
 
         keys = storage.list_keys()
         keystores = [
-            KeystoreInfo(validating_pubkey=pubkey, derivation_path=path, readonly=False)
-            for pubkey, path, _ in keys
+            KeystoreInfo(
+                validating_pubkey=pubkey,
+                derivation_path=path,
+                readonly=is_external,  # External keys are readonly
+            )
+            for pubkey, path, _, is_external in keys
         ]
         return Response(
             content={"data": [msgspec.to_builtins(k) for k in keystores]},
@@ -353,7 +358,7 @@ class SigningController(Controller):  # type: ignore[misc]
         """GET /api/v1/eth2/publicKeys - List available BLS public keys."""
         storage = _get_storage(request)
         keys = storage.list_keys()
-        public_keys = [f"0x{pubkey}" for pubkey, _, _ in keys]
+        public_keys = [f"0x{pubkey}" for pubkey, _, _, _ in keys]
         return Response(content=public_keys, status_code=HTTP_200_OK)
 
     @post("/sign/{identifier:str}")  # type: ignore[untyped-decorator]

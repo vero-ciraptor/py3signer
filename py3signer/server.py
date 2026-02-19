@@ -10,10 +10,7 @@ from granian.constants import Interfaces
 from litestar import Litestar
 from litestar.datastructures import State
 
-from .bulk_loader import (
-    import_keystores_from_separate_directories,
-    load_keystores_from_directory,
-)
+from .bulk_loader import load_external_keystores, load_keystores_from_directory
 from .handlers import get_routers
 from .metrics import MetricsServer
 from .signer import Signer
@@ -35,52 +32,43 @@ def create_app(
     """Create and configure the Litestar application."""
     # If config is provided but storage/signer are not, create them
     if config is not None and (storage is None or signer is None):
-        storage = KeyStorage(data_dir=config.data_dir)
+        storage = KeyStorage(
+            data_dir=config.data_dir,
+            external_keystores_path=config.keystores_path,
+        )
         signer = Signer(storage)
 
-        # Load keystores from unified storage (data_dir/keystores)
+        # Load keystores from managed storage (data_dir/keystores) - API imported keys
         if config.data_dir:
             keystores_dir = config.data_dir / "keystores"
             if keystores_dir.exists():
                 success, failures = load_keystores_from_directory(
                     keystores_dir,
                     storage,
+                    import_to_storage=False,  # Already in managed storage
                 )
-                logger.info(f"Loaded {success} keystores from {keystores_dir}")
+                logger.info(f"Loaded {success} keystores from managed storage")
                 if failures > 0:
                     logger.warning(f"Failed to load {failures} keystores")
             else:
-                logger.info(f"Keystores directory does not exist yet: {keystores_dir}")
-
-        # Import keystores from --keystores-path (if provided)
-        # These are imported (copied) to the unified storage location
-        if config.keystores_path and config.keystores_passwords_path:
-            # If data_dir is set, import to unified storage
-            if config.data_dir:
                 logger.info(
-                    f"Importing keystores from {config.keystores_path} "
-                    f"to unified storage at {config.data_dir / 'keystores'}"
+                    f"Managed keystores directory does not exist yet: {keystores_dir}"
                 )
-                success, failures = import_keystores_from_separate_directories(
-                    config.keystores_path,
-                    config.keystores_passwords_path,
-                    storage,
-                )
-                logger.info(f"Imported {success} keystores from external path")
-                if failures > 0:
-                    logger.warning(f"Failed to import {failures} keystores")
-            else:
-                # No data_dir - load without persistence (backward compatibility)
-                logger.warning(
-                    "No --data-dir configured, loading keystores without persistence"
-                )
-                success, failures = load_keystores_from_directory(
-                    config.keystores_path,
-                    storage,
-                )
-                logger.info(f"Loaded {success} keystores (no persistence)")
-                if failures > 0:
-                    logger.warning(f"Failed to load {failures} keystores")
+
+        # Load external keystores from --keystores-path (NOT copied to managed storage)
+        if config.keystores_path and config.keystores_passwords_path:
+            logger.info(
+                f"Loading external keystores from {config.keystores_path} "
+                f"(keys stay in external location, NOT copied)"
+            )
+            success, failures = load_external_keystores(
+                config.keystores_path,
+                config.keystores_passwords_path,
+                storage,
+            )
+            logger.info(f"Loaded {success} external keystores")
+            if failures > 0:
+                logger.warning(f"Failed to load {failures} external keystores")
 
     # Fallback for when storage/signer are passed directly (e.g., tests)
     if storage is None:
