@@ -212,12 +212,8 @@ class TestCipherSupport:
 
         keystore = Keystore(**keystore_data)
 
-        with pytest.raises(KeystoreError) as exc_info:
+        with pytest.raises(KeystoreError, match=r"(?i)(unsupported|cipher)"):
             keystore.decrypt(EIP2335_PASSWORD)
-        assert (
-            "unsupported" in str(exc_info.value).lower()
-            or "cipher" in str(exc_info.value).lower()
-        )
 
 
 class TestKDFSupport:
@@ -248,9 +244,8 @@ class TestChecksumVerification:
         """Test that wrong password fails checksum verification."""
         keystore = Keystore(**EIP2335_SCRYPT_KEYSTORE)
 
-        with pytest.raises(KeystoreError) as exc_info:
+        with pytest.raises(KeystoreError, match=r"(?i)password"):
             keystore.decrypt("wrongpassword")
-        assert "password" in str(exc_info.value).lower()
 
     def test_checksum_failure_modified_ciphertext(self) -> None:
         """Test that modified ciphertext fails checksum verification."""
@@ -264,12 +259,8 @@ class TestChecksumVerification:
 
         keystore = Keystore(**keystore_data)
 
-        with pytest.raises(KeystoreError) as exc_info:
+        with pytest.raises(KeystoreError, match=r"(?i)(password|checksum)"):
             keystore.decrypt(EIP2335_PASSWORD)
-        assert (
-            "password" in str(exc_info.value).lower()
-            or "checksum" in str(exc_info.value).lower()
-        )
 
 
 class TestEdgeCases:
@@ -281,9 +272,8 @@ class TestEdgeCases:
         # This will fail checksum since original was encrypted with non-empty password
         keystore = Keystore(**EIP2335_SCRYPT_KEYSTORE)
 
-        with pytest.raises(KeystoreError) as exc_info:
+        with pytest.raises(KeystoreError, match=r"(?i)password"):
             keystore.decrypt("")
-        assert "password" in str(exc_info.value).lower()
 
     def test_unicode_password_with_emoji(self) -> None:
         """Test password with emoji and unicode characters."""

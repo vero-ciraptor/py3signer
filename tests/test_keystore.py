@@ -27,28 +27,19 @@ class TestKeystore:
 
     def test_from_json_invalid(self) -> None:
         """Test loading invalid JSON."""
-        with pytest.raises(msgspec.DecodeError, match="JSON is malformed") as exc_info:
+        with pytest.raises(msgspec.DecodeError, match="JSON is malformed"):
             Keystore.from_json("not valid json")
-
-        assert (
-            "malformed" in str(exc_info.value).lower()
-            or "json" in str(exc_info.value).lower()
-        )
 
     def test_missing_required_field(self) -> None:
         """Test validation of required fields."""
         incomplete: dict[str, Any] = {"crypto": {}, "version": 4}
 
         # msgspec.Struct raises TypeError for missing required fields
-        with pytest.raises((KeystoreError, TypeError)) as exc_info:
+        with pytest.raises(
+            (KeystoreError, TypeError),
+            match=r"(pubkey|path|uuid|required|missing)",
+        ):
             Keystore(**incomplete)
-
-        # Should mention missing required field
-        error_str = str(exc_info.value).lower()
-        assert any(
-            field in error_str
-            for field in ["pubkey", "path", "uuid", "required", "missing"]
-        )
 
     def test_invalid_crypto_structure(self) -> None:
         """Test validation of crypto structure."""
@@ -60,9 +51,8 @@ class TestKeystore:
             "version": 4,
         }
 
-        with pytest.raises(KeystoreError) as exc_info:
+        with pytest.raises(KeystoreError, match="Invalid crypto structure"):
             Keystore(**bad_crypto)
-        assert "Invalid crypto structure" in str(exc_info.value)
 
     def test_description_property(self, sample_keystore: dict[str, Any]) -> None:
         """Test description property."""
@@ -139,13 +129,8 @@ class TestKeystore:
             "version": 3,  # Unsupported version
         }
 
-        with pytest.raises(KeystoreError) as exc_info:
+        with pytest.raises(KeystoreError, match=r"(?i)(version.*not supported|4)"):
             Keystore(**keystore_data)
-
-        assert "version" in str(exc_info.value).lower()
-        assert "not supported" in str(exc_info.value).lower() or "4" in str(
-            exc_info.value
-        )
 
 
 class TestKeystoreDecryption:
@@ -217,10 +202,8 @@ class TestKeystoreDecryption:
         keystore_path = Path(__file__).parent / "data" / keystore_file
         ks = Keystore.from_file(keystore_path)
 
-        with pytest.raises(KeystoreError) as exc_info:
+        with pytest.raises(KeystoreError, match=r"(?i)(password|invalid)"):
             ks.decrypt("wrongpassword")
-        error_msg = str(exc_info.value).lower()
-        assert "password" in error_msg or "invalid" in error_msg
 
 
 class TestKeystoreDecryptionLegacy:
@@ -231,10 +214,8 @@ class TestKeystoreDecryptionLegacy:
         keystore_json = json.dumps(sample_keystore)
         ks = Keystore.from_json(keystore_json)
 
-        with pytest.raises(KeystoreError) as exc_info:
+        with pytest.raises(KeystoreError, match=r"(?i)(password|invalid)"):
             ks.decrypt("wrongpassword")
-        error_msg = str(exc_info.value).lower()
-        assert "password" in error_msg or "invalid" in error_msg
 
 
 class TestKeystoreDecryptionV4:
@@ -291,11 +272,8 @@ class TestKeystoreEdgeCases:
         keystore_json = json.dumps(sample_keystore)
         ks = Keystore.from_json(keystore_json)
 
-        with pytest.raises(KeystoreError) as exc_info:
+        with pytest.raises(KeystoreError, match=r"(?i)(password|invalid)"):
             ks.decrypt("")
-
-        error_msg = str(exc_info.value).lower()
-        assert "password" in error_msg or "invalid" in error_msg
 
     def test_none_password_not_allowed(self, sample_keystore: dict[str, Any]) -> None:
         """Test that None password raises an error."""

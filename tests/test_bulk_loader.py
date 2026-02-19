@@ -110,11 +110,8 @@ class TestLoadKeystoreWithPassword:
         password_path = tmp_path / "password.txt"
         password_path.write_text("wrongpassword")
 
-        with pytest.raises(KeystoreError) as exc_info:
+        with pytest.raises(KeystoreError, match=r"(?i)(password|invalid)"):
             load_keystore_with_password(keystore_path, password_path)
-
-        error_msg = str(exc_info.value).lower()
-        assert "password" in error_msg or "invalid" in error_msg
 
     def test_missing_password_file(self, tmp_path: Path) -> None:
         """Test when password file doesn't exist."""
