@@ -12,6 +12,7 @@ from litestar.datastructures import State
 
 from .bulk_loader import load_input_only_keystores, load_keystores_from_directory
 from .handlers import get_routers
+from .metrics import MetricsServer
 from .signer import Signer
 from .storage import KeyStorage
 
@@ -108,7 +109,13 @@ async def run_server(config: Config) -> None:
         log_level=granian_log_level,
     )
 
+    # Start metrics server in the main process (not workers)
+    metrics_server = MetricsServer(host=config.metrics_host, port=config.metrics_port)
+    metrics_server.start()
+
     try:
         server.serve()
     except KeyboardInterrupt:
         logger.info("Shutting down...")
+    finally:
+        metrics_server.stop()

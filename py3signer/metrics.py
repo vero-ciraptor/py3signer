@@ -1,11 +1,13 @@
-"""Prometheus metrics for py3signer.
+"""Prometheus metrics for py3signer with standalone HTTP server.
 
 This module defines and exposes all Prometheus metrics used by py3signer.
+Metrics are served on a separate port using prometheus_client's built-in HTTP server.
 """
 
 from __future__ import annotations
 
 import logging
+import threading
 from typing import TYPE_CHECKING
 
 from litestar import Controller, get
@@ -18,11 +20,12 @@ from prometheus_client import (
     Histogram,
     Info,
     generate_latest,
-    make_asgi_app,
+    start_http_server,
 )
 
 if TYPE_CHECKING:
-    from litestar.types import ASGIApp
+    from socketserver import ThreadingMixIn
+    from wsgiref.types import WSGIApplication
 
 logger = logging.getLogger(__name__)
 
@@ -94,35 +97,92 @@ def get_metrics_content_type() -> str:
     return CONTENT_TYPE_LATEST
 
 
-def create_metrics_app() -> ASGIApp:
-    """Create ASGI app for serving Prometheus metrics.
-    
-    This uses prometheus_client's make_asgi_app() to serve metrics
-    at the /metrics endpoint. The returned app can be mounted in
-    the main Litestar application.
-    """
-    return make_asgi_app(registry=REGISTRY)
+# Metrics HTTP controller for backward compatibility (used by tests and direct imports)
 
 
-# Keep MetricsController for backward compatibility and health endpoint
 class MetricsController(Controller):  # type: ignore[misc]
-    """Prometheus metrics HTTP endpoints."""
+    """Prometheus metrics HTTP endpoints.
+
+    Note: In production, metrics are served on a separate port via the
+    standalone metrics server. This controller is kept for backward
+    compatibility and testing purposes.
+    """
 
     path = "/"
 
-    @get("/health")  # type: ignore[untyped-decorator]
-    async def health(self) -> dict[str, str]:
-        """Health check for metrics."""
-        return {"status": "healthy"}
-
     @get("/metrics")  # type: ignore[untyped-decorator]
     async def metrics(self) -> Response:
-        """Handler for the /metrics endpoint (kept for backward compatibility).
-        
-        Note: In production, the metrics endpoint is served via the ASGI app
-        mounted in the main Litestar application for better performance.
-        """
+        """Handler for the /metrics endpoint."""
         return Response(
             content=get_metrics_output(),
             headers={"Content-Type": get_metrics_content_type()},
         )
+
+    @get("/health")  # type: ignore[untyped-decorator]
+    async def health(self) -> dict[str, str]:
+        """Health check for metrics server."""
+        return {"status": "healthy"}
+
+
+# Standalone metrics server using prometheus_client's built-in HTTP server
+
+
+class MetricsServer:
+    """Standalone Prometheus metrics HTTP server using prometheus_client.start_http_server.
+
+    This runs the metrics endpoint on a separate port from the main API,
+    allowing metrics to be scraped independently.
+    """
+
+    def __init__(self, host: str = "127.0.0.1", port: int = 8081) -> None:
+        self._host = host
+        self._port = port
+        self._httpd: ThreadingMixIn | None = None
+        self._thread: threading.Thread | None = None
+
+    def start(self) -> None:
+        """Start the metrics server in a background thread.
+
+        This uses prometheus_client.start_http_server() which creates a
+        threaded HTTP server that serves metrics from the global registry.
+        """
+        # Start the server in a daemon thread
+        self._thread = threading.Thread(
+            target=self._run_server,
+            daemon=True,
+        )
+        self._thread.start()
+        logger.info(
+            f"Metrics server started at http://{self._host}:{self._port}/metrics",
+        )
+
+    def _run_server(self) -> None:
+        """Run the HTTP server (called in background thread)."""
+        try:
+            self._httpd = start_http_server(
+                port=self._port,
+                addr=self._host,
+                registry=REGISTRY,
+            )
+        except Exception:
+            logger.exception("Failed to start metrics server")
+            raise
+
+    def stop(self) -> None:
+        """Stop the metrics server."""
+        if self._httpd is not None:
+            # The httpd from start_http_server is a ThreadingHTTPServer
+            # We need to shut it down gracefully
+            try:
+                self._httpd.shutdown()
+                self._httpd.server_close()
+            except Exception:
+                logger.exception("Error stopping metrics server")
+            finally:
+                self._httpd = None
+
+        if self._thread is not None:
+            self._thread.join(timeout=2)
+            self._thread = None
+
+        logger.info("Metrics server stopped")

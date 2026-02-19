@@ -5,7 +5,7 @@ from enum import Enum
 from typing import Any
 
 import msgspec
-from litestar import Controller, Request, Response, Router, asgi, delete, get, post
+from litestar import Controller, Request, Response, Router, delete, get, post
 from litestar.exceptions import HTTPException, NotFoundException, ValidationException
 from litestar.status_codes import (
     HTTP_200_OK,
@@ -14,7 +14,6 @@ from litestar.status_codes import (
 )
 
 from .keystore import Keystore, KeystoreError
-from .metrics import create_metrics_app
 from .signer import Signer, SignerError
 from .signing_types import (
     SignRequest,
@@ -398,19 +397,11 @@ class SigningController(Controller):  # type: ignore[misc]
 
 # Router configuration
 
-# Create ASGI route handler for metrics endpoint using the asgi decorator
-@asgi(path="/metrics", is_mount=False, copy_scope=True)  # type: ignore[untyped-decorator]
-async def metrics_asgi_handler(scope: dict, receive: Any, send: Any) -> None:
-    """ASGI handler for Prometheus metrics endpoint."""
-    metrics_app = create_metrics_app()
-    await metrics_app(scope, receive, send)
-
 
 def get_routers() -> list[Router]:
     """Get all routers for the application."""
     return [
         Router(path="/", route_handlers=[HealthController]),
-        Router(path="/", route_handlers=[metrics_asgi_handler]),
         Router(path="/", route_handlers=[KeystoreController]),
         Router(path="/", route_handlers=[RemoteKeysController]),
         Router(path="/", route_handlers=[SigningController]),

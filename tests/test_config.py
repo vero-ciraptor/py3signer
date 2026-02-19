@@ -179,6 +179,36 @@ class TestPortConfig:
             Config(port=65536)
 
 
+class TestMetricsPortConfig:
+    """Tests for metrics port configuration validation."""
+
+    def test_default_metrics_port(self) -> None:
+        """Test that default metrics port is 8081."""
+        config = Config()
+        assert config.metrics_port == 8081
+        assert config.metrics_host == "127.0.0.1"
+
+    def test_valid_metrics_port(self) -> None:
+        """Test that valid metrics ports are accepted."""
+        config = Config(metrics_port=9090)
+        assert config.metrics_port == 9090
+
+    def test_metrics_port_too_low(self) -> None:
+        """Test error when metrics port is too low."""
+        with pytest.raises(ValueError, match="metrics_port must be between"):
+            Config(metrics_port=0)
+
+    def test_metrics_port_too_high(self) -> None:
+        """Test error when metrics port is too high."""
+        with pytest.raises(ValueError, match="metrics_port must be between"):
+            Config(metrics_port=65536)
+
+    def test_custom_metrics_host(self) -> None:
+        """Test that custom metrics host can be set."""
+        config = Config(metrics_host="0.0.0.0")
+        assert config.metrics_host == "0.0.0.0"
+
+
 class TestLogLevelConfig:
     """Tests for log level configuration validation."""
 

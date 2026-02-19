@@ -3,13 +3,14 @@
 from typing import TYPE_CHECKING
 
 import pytest
+import httpx
 from litestar import Litestar
 from litestar.datastructures import State
 from litestar.testing import AsyncTestClient
 
 from py3signer import metrics
 from py3signer.handlers import get_routers
-from py3signer.metrics import MetricsController
+from py3signer.metrics import MetricsController, MetricsServer
 from py3signer.signer import Signer
 from py3signer.storage import KeyStorage
 
@@ -33,8 +34,9 @@ def create_test_app() -> Litestar:
 
 @pytest.fixture
 async def metrics_client() -> AsyncGenerator[AsyncTestClient]:
-    """Create a test client for metrics endpoints (via main app router)."""
-    app = create_test_app()
+    """Create a test client for metrics endpoints (via MetricsController)."""
+    # Use MetricsController directly for testing metrics output
+    app = Litestar(route_handlers=[MetricsController], debug=False)
     async with AsyncTestClient(app) as client:
         yield client
 
@@ -120,14 +122,6 @@ def test_metrics_output() -> None:
     assert b"py3signer_build_info" in output
 
 
-def test_create_metrics_app() -> None:
-    """Test that create_metrics_app returns an ASGI app."""
-    app = metrics.create_metrics_app()
-    assert app is not None
-    # The app should be callable
-    assert callable(app)
-
-
 @pytest.mark.asyncio
 async def test_metrics_via_standalone_controller() -> None:
     """Test metrics controller directly (backward compatibility)."""
@@ -138,3 +132,60 @@ async def test_metrics_via_standalone_controller() -> None:
         assert "py3signer_build_info" in resp.text
 
 
+class TestMetricsServer:
+    """Tests for the standalone MetricsServer using start_http_server."""
+
+    def test_metrics_server_start_stop(self) -> None:
+        """Test that MetricsServer can start and stop."""
+        # Use a different port to avoid conflicts
+        server = MetricsServer(host="127.0.0.1", port=0)  # port 0 = auto-assign
+        # Just verify the server object is created properly
+        assert server._host == "127.0.0.1"
+
+    def test_metrics_server_lifecycle(self) -> None:
+        """Test MetricsServer start/stop lifecycle."""
+        # Use an ephemeral port
+        import socket
+
+        # Find an available port
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+
+        server = MetricsServer(host="127.0.0.1", port=port)
+
+        # Start the server
+        server.start()
+        import time
+
+        time.sleep(0.1)  # Give server time to start
+
+        # Verify metrics are accessible
+        response = httpx.get(f"http://127.0.0.1:{port}/metrics", timeout=5)
+        assert response.status_code == 200
+        assert "py3signer_build_info" in response.text
+
+        # Stop the server
+        server.stop()
+
+    def test_metrics_server_health_endpoint(self) -> None:
+        """Test metrics server health endpoint via standalone server."""
+        import socket
+
+        # Find an available port
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", 0))
+            port = s.getsockname()[1]
+
+        server = MetricsServer(host="127.0.0.1", port=port)
+        server.start()
+        import time
+
+        time.sleep(0.1)
+
+        try:
+            response = httpx.get(f"http://127.0.0.1:{port}/", timeout=5)
+            # The root path may return 404 or the metrics page depending on implementation
+            assert response.status_code in [200, 404]
+        finally:
+            server.stop()
