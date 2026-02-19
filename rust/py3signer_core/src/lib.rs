@@ -157,7 +157,7 @@ fn sign(
         // blst::min_sig::SecretKey::sign returns Signature directly (not Result)
         sk.sign(
             &message_bytes,
-            b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_",
+            b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_",
             &[],
         )
     });
@@ -187,7 +187,7 @@ fn verify(
         sig.verify(
             true,                                           // sig_groupcheck
             &message_bytes,                                 // msg (already the signing root)
-            b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_", // dst
+            b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_", // dst
             &[],                                            // aug
             &pk,                                            // pk
             true,                                           // pk_validate
