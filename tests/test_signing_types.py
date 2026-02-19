@@ -10,6 +10,7 @@ from py3signer.signing_types import (
     DOMAIN_APPLICATION_MASK,
     DOMAIN_BEACON_ATTESTER,
     DOMAIN_BEACON_PROPOSER,
+    DOMAIN_BLOB_SIDECAR,
     DOMAIN_CONTRIBUTION_AND_PROOF,
     DOMAIN_DEPOSIT,
     DOMAIN_RANDAO,
@@ -23,6 +24,8 @@ from py3signer.signing_types import (
     AggregationSlotSignRequest,
     AttestationData,
     AttestationSignRequest,
+    BlobSidecar,
+    BlobSidecarSignRequest,
     BlockSignRequest,
     BlockV2SignRequest,
     DepositData,
@@ -62,6 +65,7 @@ class TestDomainConstants:
             DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF,
             DOMAIN_CONTRIBUTION_AND_PROOF,
             DOMAIN_APPLICATION_MASK,
+            DOMAIN_BLOB_SIDECAR,
         ]
         for domain in domains:
             assert len(domain) == 4
@@ -393,6 +397,22 @@ class TestGetDomainForRequest:
         )
         assert get_domain_for_request(request) == DOMAIN_APPLICATION_MASK
 
+    def test_blob_sidecar_domain(self) -> None:
+        """BLOB_SIDECAR should return DOMAIN_BLOB_SIDECAR."""
+        request = BlobSidecarSignRequest(
+            fork_info=ForkInfo(
+                fork=Fork(previous_version="0x0", current_version="0x0", epoch="0"),
+                genesis_validators_root="0x0",
+            ),
+            signing_root="0x" + "00" * 32,
+            blob_sidecar=BlobSidecar(
+                slot="100",
+                block_root="0x0",
+                index="0",
+            ),
+        )
+        assert get_domain_for_request(request) == DOMAIN_BLOB_SIDECAR
+
 
 class TestValidateSigningRoot:
     """Tests for validate_signing_root function."""
@@ -447,6 +467,7 @@ class TestAllSigningTypes:
                 SyncCommitteeContributionAndProofSignRequest,
             ),
             ("VALIDATOR_REGISTRATION", ValidatorRegistrationSignRequest),
+            ("BLOB_SIDECAR", BlobSidecarSignRequest),
         ],
     )
     def test_all_types_discriminate(self, type_name: str, expected_class: type) -> None:
@@ -523,6 +544,13 @@ class TestAllSigningTypes:
                     "gas_limit": "30000000",
                     "timestamp": "1",
                     "pubkey": "0x0",
+                },
+            },
+            "BLOB_SIDECAR": {
+                "blob_sidecar": {
+                    "slot": "100",
+                    "block_root": "0x0",
+                    "index": "0",
                 },
             },
         }

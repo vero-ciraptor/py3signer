@@ -22,6 +22,7 @@ DOMAIN_SYNC_COMMITTEE = bytes.fromhex("07000000")
 DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF = bytes.fromhex("08000000")
 DOMAIN_CONTRIBUTION_AND_PROOF = bytes.fromhex("09000000")
 DOMAIN_APPLICATION_MASK = bytes.fromhex("0a000000")
+DOMAIN_BLOB_SIDECAR = bytes.fromhex("0b000000")
 
 
 class Fork(msgspec.Struct, frozen=True):
@@ -151,6 +152,18 @@ class ValidatorRegistration(msgspec.Struct, frozen=True):
     gas_limit: str = msgspec.field(name="gas_limit")
     timestamp: str
     pubkey: str
+
+
+class BlobSidecar(msgspec.Struct, frozen=True):
+    """Blob sidecar data for BLOB_SIDECAR signing type.
+
+    Per Ethereum Remote Signing API spec v1.3.0, BlobSidecar
+    contains the data needed to sign a blob sidecar for Deneb+.
+    """
+
+    slot: str
+    block_root: str = msgspec.field(name="block_root")
+    index: str
 
 
 # Union of all signing request types
@@ -339,6 +352,23 @@ class ValidatorRegistrationSignRequest(
     signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
+class BlobSidecarSignRequest(
+    msgspec.Struct,
+    kw_only=True,
+    frozen=True,
+    tag_field="type",
+    tag="BLOB_SIDECAR",
+):
+    """Request to sign a blob sidecar.
+
+    Used for signing blob sidecars in Deneb and later forks.
+    """
+
+    blob_sidecar: BlobSidecar
+    fork_info: ForkInfo = msgspec.field(name="fork_info")
+    signing_root: str | None = msgspec.field(name="signing_root", default=None)
+
+
 # The union type for all sign requests
 SignRequest = (
     AggregationSlotSignRequest
@@ -354,6 +384,7 @@ SignRequest = (
     | SyncCommitteeSelectionProofSignRequest
     | SyncCommitteeContributionAndProofSignRequest
     | ValidatorRegistrationSignRequest
+    | BlobSidecarSignRequest
 )
 
 # JSON decoder for discriminated sign requests
@@ -397,6 +428,8 @@ def get_domain_for_request(request: SignRequest) -> bytes:
             return DOMAIN_CONTRIBUTION_AND_PROOF
         case ValidatorRegistrationSignRequest():
             return DOMAIN_APPLICATION_MASK
+        case BlobSidecarSignRequest():
+            return DOMAIN_BLOB_SIDECAR
         case _:
             raise ValueError(f"Unknown signing request type: {type(request)}")
 
