@@ -248,11 +248,11 @@ class TestBulkLoaderIntegration:
 
         # Use three different keystores with unique secret keys
         # Note: test_keystore.json and test_keystore_scrypt.json have the same secret
-        # but failing_keystore.json has a different one
+        # but keystore_valid_2.json has a different one
         keystores_to_create = [
             ("test_keystore_scrypt.json", "testpassword123"),
             ("test_keystore_pbkdf2.json", "testpassword123"),
-            ("failing_keystore.json", "LnCqP2XDKqPwRX96vKq0If512SrCebdDDRLRYCEI4fM="),
+            ("keystore_valid_2.json", "LnCqP2XDKqPwRX96vKq0If512SrCebdDDRLRYCEI4fM="),
         ]
 
         created_keystores = []

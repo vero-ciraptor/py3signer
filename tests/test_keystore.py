@@ -173,9 +173,9 @@ class TestKeystoreDecryptionV4:
 
     def test_decrypt_v4_pbkdf2_keystore(self) -> None:
         """Test decrypting a version 4 PBKDF2 keystore with SHA-256 checksum."""
-        # The failing_keystore is a v4 keystore that uses SHA-256 for checksum
-        keystore_path = Path(__file__).parent / "data" / "failing_keystore.json"
-        password_path = Path(__file__).parent / "data" / "failing_keystore.txt"
+        # The keystore_valid_2 is a v4 keystore that uses SHA-256 for checksum
+        keystore_path = Path(__file__).parent / "data" / "keystore_valid_2.json"
+        password_path = Path(__file__).parent / "data" / "keystore_valid_2.txt"
 
         keystore = Keystore.from_file(keystore_path)
         password = password_path.read_text().strip()
