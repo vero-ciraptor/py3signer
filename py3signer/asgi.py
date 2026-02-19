@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from litestar import Litestar
+    from litestar.types import LifeSpanScope, Scope
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ def get_app() -> Litestar:
 # ASGI application callable
 # Granian calls this with (scope, receive, send)
 async def app(
-    scope: dict[str, Any],
+    scope: Scope | LifeSpanScope,
     receive: Callable[..., Any],
     send: Callable[..., Any],
 ) -> None:
