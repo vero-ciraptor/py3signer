@@ -7,10 +7,7 @@ from typing import Any
 import msgspec
 from litestar import Controller, Request, Response, Router, delete, get, post
 from litestar.exceptions import HTTPException, NotFoundException, ValidationException
-from litestar.status_codes import (
-    HTTP_200_OK,
-    HTTP_500_INTERNAL_SERVER_ERROR,
-)
+from litestar.status_codes import HTTP_200_OK, HTTP_500_INTERNAL_SERVER_ERROR
 
 from .keystore import Keystore, KeystoreError
 from .signer import Signer, SignerError
@@ -62,6 +59,8 @@ class KeystoreImportResult(msgspec.Struct):
 
 
 class KeystoreDeleteStatus(Enum):
+    """Status of a keystore deletion operation."""
+
     # key was active and removed
     DELETED = "deleted"
     # slashing protection data returned but key was not active
@@ -142,6 +141,216 @@ def _get_signer(request: Request) -> Signer:
     return result
 
 
+# Validation helpers
+
+
+def _validate_import_request(data: dict[str, Any]) -> KeystoreImportRequest:
+    """Validate and parse keystore import request.
+
+    Args:
+        data: Raw request data
+
+    Returns:
+        Parsed KeystoreImportRequest
+
+    Raises:
+        ValidationException: If validation fails
+
+    """
+    try:
+        return msgspec.convert(data, KeystoreImportRequest)
+    except (msgspec.ValidationError, msgspec.DecodeError) as e:
+        raise ValidationException(detail=f"Validation error: {e}") from e
+    except ValueError as e:
+        raise ValidationException(detail=str(e)) from e
+
+
+def _validate_delete_request(data: dict[str, Any]) -> KeystoreDeleteRequest:
+    """Validate and parse keystore delete request.
+
+    Args:
+        data: Raw request data
+
+    Returns:
+        Parsed KeystoreDeleteRequest
+
+    Raises:
+        ValidationException: If validation fails
+
+    """
+    try:
+        return msgspec.convert(data, KeystoreDeleteRequest)
+    except (msgspec.ValidationError, msgspec.DecodeError) as e:
+        raise ValidationException(detail=f"Validation error: {e}") from e
+    except ValueError as e:
+        raise ValidationException(detail=str(e)) from e
+
+
+def _clean_pubkey_hex(pubkey_hex: str) -> str:
+    """Clean a public key hex string (remove 0x prefix and lowercase).
+
+    Args:
+        pubkey_hex: The public key hex string
+
+    Returns:
+        Cleaned hex string
+
+    """
+    return pubkey_hex.lower().replace("0x", "")
+
+
+# Import helper
+
+
+def _import_single_keystore(
+    keystore_json: str,
+    password: str,
+    existing_keys: set[str],
+    storage: KeyStorage,
+    persistence_enabled: bool,
+) -> KeystoreImportResult:
+    """Import a single keystore.
+
+    Args:
+        keystore_json: The keystore JSON string
+        password: The password for the keystore
+        existing_keys: Set of existing public key hex strings
+        storage: The KeyStorage instance
+        persistence_enabled: Whether persistence is enabled
+
+    Returns:
+        KeystoreImportResult with status and message
+
+    """
+    try:
+        keystore = Keystore.from_json(keystore_json)
+        secret_key = keystore.decrypt(password)
+        pubkey = secret_key.public_key()
+        pubkey_hex = pubkey.to_bytes().hex()
+
+        if pubkey_hex in existing_keys:
+            return KeystoreImportResult(
+                status="duplicate",
+                message=f"Keystore already exists for pubkey {keystore.pubkey}",
+            )
+
+        # Add key with optional persistence
+        _, persisted = storage.add_key(
+            pubkey=pubkey,
+            secret_key=secret_key,
+            path=keystore.path,
+            description=keystore.description,
+            keystore_json=keystore_json if persistence_enabled else None,
+            password=password if persistence_enabled else None,
+        )
+
+        if persistence_enabled and not persisted:
+            logger.warning(
+                f"Failed to persist keystore to disk: {pubkey_hex[:20]}...",
+            )
+
+        existing_keys.add(pubkey_hex)
+        return KeystoreImportResult(
+            status="imported",
+            message=f"Successfully imported keystore with pubkey {keystore.pubkey}",
+        )
+
+    except KeystoreError as e:
+        return KeystoreImportResult(status="error", message=str(e))
+    except Exception as e:
+        logger.exception("Unexpected error importing keystore")
+        return KeystoreImportResult(
+            status="error",
+            message=f"Internal error: {e}",
+        )
+
+
+# Delete helper
+
+
+def _delete_single_key(
+    pubkey_hex: str,
+    storage: KeyStorage,
+) -> tuple[KeystoreDeleteResult, dict[str, Any] | None]:
+    """Delete a single key and return result with optional slashing data.
+
+    Args:
+        pubkey_hex: The public key hex string (with or without 0x prefix)
+        storage: The KeyStorage instance
+
+    Returns:
+        Tuple of (delete result, slashing data entry or None)
+
+    """
+    cleaned_pubkey = _clean_pubkey_hex(pubkey_hex)
+
+    try:
+        storage.remove_key(cleaned_pubkey)
+    except KeyNotFound:
+        return KeystoreDeleteResult(status=KeystoreDeleteStatus.NOT_FOUND), None
+    except Exception as e:
+        return (
+            KeystoreDeleteResult(status=KeystoreDeleteStatus.ERROR, message=str(e)),
+            None,
+        )
+
+    # Build slashing protection entry for deleted key
+    slashing_entry = {
+        "pubkey": f"0x{cleaned_pubkey}",
+        "signed_blocks": [],
+        "signed_attestations": [],
+    }
+    return KeystoreDeleteResult(status=KeystoreDeleteStatus.DELETED), slashing_entry
+
+
+# Signing helpers
+
+
+async def _parse_sign_request(request: Request) -> SignRequest:
+    """Parse and validate a sign request from the request body.
+
+    Args:
+        request: The HTTP request
+
+    Returns:
+        Parsed SignRequest
+
+    Raises:
+        ValidationException: If parsing fails
+
+    """
+    from typing import cast
+
+    try:
+        body_bytes = await request.body()
+        return cast("SignRequest", sign_request_decoder.decode(body_bytes))
+    except (msgspec.ValidationError, msgspec.DecodeError) as e:
+        raise ValidationException(detail=f"Validation error: {e}") from e
+    except ValueError as e:
+        raise ValidationException(detail=str(e)) from e
+
+
+def _build_slashing_protection_response(
+    entries: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Build slashing protection response per EIP-3076.
+
+    Args:
+        entries: List of slashing data entries
+
+    Returns:
+        EIP-3076 formatted slashing protection data
+
+    """
+    return {
+        "metadata": {
+            "interchange_format_version": "5",
+            "genesis_validators_root": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        },
+        "data": entries,
+    }
+
+
 # Controllers
 
 
@@ -200,79 +409,34 @@ class LocalKeyManagerController(Controller):  # type: ignore[misc]
         Accepts EIP-3076 slashing_protection data (stored but not processed).
         """
         storage = _get_storage(request)
-
-        # Validate request manually since msgspec doesn't integrate directly
-        try:
-            import_req = msgspec.convert(data, KeystoreImportRequest)
-        except (msgspec.ValidationError, msgspec.DecodeError) as e:
-            raise ValidationException(detail=f"Validation error: {e}") from e
-        except ValueError as e:
-            raise ValidationException(detail=str(e)) from e
+        import_request = _validate_import_request(data)
 
         # Log if slashing protection data was provided (we accept but don't process it)
-        if import_req.slashing_protection:
+        if import_request.slashing_protection:
             logger.warning(
-                "Slashing protection data provided during import (accepted but not processed)"
+                "Slashing protection data provided during import (accepted but not processed)",
             )
 
-        results = []
-        existing_keys = {k.pubkey_hex for k in storage.list_keys()}
+        existing_keys = {key.pubkey_hex for key in storage.list_keys()}
         persistence_enabled = storage.managed_keystores_dir is not None
 
-        for keystore_json, password in zip(
-            import_req.keystores, import_req.passwords, strict=True
-        ):
-            try:
-                keystore = Keystore.from_json(keystore_json)
-                secret_key = keystore.decrypt(password)
-                pubkey = secret_key.public_key()
-                pubkey_hex = pubkey.to_bytes().hex()
-
-                if pubkey_hex in existing_keys:
-                    results.append(
-                        KeystoreImportResult(
-                            status="duplicate",
-                            message=f"Keystore already exists for pubkey {keystore.pubkey}",
-                        ),
-                    )
-                    continue
-
-                # Add key with optional persistence
-                _, persisted = storage.add_key(
-                    pubkey=pubkey,
-                    secret_key=secret_key,
-                    path=keystore.path,
-                    description=keystore.description,
-                    keystore_json=keystore_json if persistence_enabled else None,
-                    password=password if persistence_enabled else None,
-                )
-
-                if persistence_enabled and not persisted:
-                    logger.warning(
-                        f"Failed to persist keystore to disk: {pubkey_hex[:20]}...",
-                    )
-
-                existing_keys.add(pubkey_hex)
-                results.append(
-                    KeystoreImportResult(
-                        status="imported",
-                        message=f"Successfully imported keystore with pubkey {keystore.pubkey}",
-                    ),
-                )
-
-            except KeystoreError as e:
-                results.append(KeystoreImportResult(status="error", message=str(e)))
-            except Exception as e:
-                logger.exception("Unexpected error importing keystore")
-                results.append(
-                    KeystoreImportResult(
-                        status="error",
-                        message=f"Internal error: {e}",
-                    ),
-                )
+        results = [
+            _import_single_keystore(
+                keystore_json=keystore_json,
+                password=password,
+                existing_keys=existing_keys,
+                storage=storage,
+                persistence_enabled=persistence_enabled,
+            )
+            for keystore_json, password in zip(
+                import_request.keystores,
+                import_request.passwords,
+                strict=True,
+            )
+        ]
 
         return Response(
-            content={"data": [msgspec.to_builtins(r) for r in results]},
+            content={"data": [msgspec.to_builtins(result) for result in results]},
             status_code=HTTP_200_OK,
         )
 
@@ -288,56 +452,18 @@ class LocalKeyManagerController(Controller):  # type: ignore[misc]
         Per the spec, slashing protection data must be retained even after deletion.
         """
         storage = _get_storage(request)
+        delete_request = _validate_delete_request(data)
 
-        try:
-            delete_req = msgspec.convert(data, KeystoreDeleteRequest)
-        except (msgspec.ValidationError, msgspec.DecodeError) as e:
-            raise ValidationException(detail=f"Validation error: {e}") from e
-        except ValueError as e:
-            raise ValidationException(detail=str(e)) from e
+        results: list[KeystoreDeleteResult] = []
+        slashing_entries: list[dict[str, Any]] = []
 
-        results = []
-        # Track pubkeys that had slashing data (active or not_active status)
-        # For now, we return empty slashing protection for all deleted keys
-        # A full implementation would track attestation/block signing history
-        slashing_data_entries: list[dict[str, Any]] = []
+        for pubkey_hex in delete_request.pubkeys:
+            result, slashing_entry = _delete_single_key(pubkey_hex, storage)
+            results.append(result)
+            if slashing_entry:
+                slashing_entries.append(slashing_entry)
 
-        for pubkey_hex in delete_req.pubkeys:
-            pubkey_hex_clean = pubkey_hex.lower().replace("0x", "")
-            try:
-                storage.remove_key(pubkey_hex_clean)
-            except KeyNotFound:
-                results.append(
-                    KeystoreDeleteResult(status=KeystoreDeleteStatus.NOT_FOUND)
-                )
-            except Exception as e:
-                error = str(e)
-                results.append(
-                    KeystoreDeleteResult(
-                        status=KeystoreDeleteStatus.ERROR, message=error
-                    )
-                )
-            else:
-                results.append(
-                    KeystoreDeleteResult(status=KeystoreDeleteStatus.DELETED)
-                )
-                # Add empty entry for this pubkey to slashing protection data
-                slashing_data_entries.append(
-                    {
-                        "pubkey": f"0x{pubkey_hex_clean}",
-                        "signed_blocks": [],
-                        "signed_attestations": [],
-                    }
-                )
-
-        # Build slashing protection response per EIP-3076
-        slashing_protection = {
-            "metadata": {
-                "interchange_format_version": "5",
-                "genesis_validators_root": "0x0000000000000000000000000000000000000000000000000000000000000000",
-            },
-            "data": slashing_data_entries,
-        }
+        slashing_protection = _build_slashing_protection_response(slashing_entries)
 
         return Response(
             content={
@@ -366,21 +492,16 @@ class SigningController(Controller):  # type: ignore[misc]
         """POST /api/v1/eth2/sign/:identifier - Sign data."""
         signer = _get_signer(request)
 
-        pubkey_hex = identifier.lower().replace("0x", "")
+        pubkey_hex = _clean_pubkey_hex(identifier)
         if not pubkey_hex:
             raise ValidationException(detail="Missing identifier")
 
-        # Read and parse request body
-        try:
-            body_bytes = await request.body()
-            sign_req: SignRequest = sign_request_decoder.decode(body_bytes)
-        except (msgspec.ValidationError, msgspec.DecodeError) as e:
-            raise ValidationException(detail=f"Validation error: {e}") from e
-        except ValueError as e:
-            raise ValidationException(detail=str(e)) from e
+        # Parse request body
+        sign_request = await _parse_sign_request(request)
 
+        # Validate signing root
         try:
-            message = validate_signing_root(sign_req.signing_root)
+            message = validate_signing_root(sign_request.signing_root)
         except ValueError as e:
             raise ValidationException(detail=str(e)) from e
 
@@ -390,38 +511,21 @@ class SigningController(Controller):  # type: ignore[misc]
                 "is not yet implemented. Please provide signing_root in the request.",
             )
 
+        # Get domain for signing
         try:
-            domain = get_domain_for_request(sign_req)
+            domain = get_domain_for_request(sign_request)
         except ValueError as e:
             raise HTTPException(
                 status_code=HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=str(e),
             ) from e
 
+        # Perform signing
         try:
             signature = signer.sign_data(
                 pubkey_hex=pubkey_hex,
                 data=message,
                 domain=domain,
-            )
-            signature_hex = signature.to_bytes().hex()
-            full_signature = f"0x{signature_hex}"
-
-            # Check Accept header to determine response format
-            accept_header = request.headers.get("Accept", "")
-
-            if accept_header == "text/plain":
-                # Return plain text signature
-                return Response(
-                    content=full_signature,
-                    status_code=HTTP_200_OK,
-                    media_type="text/plain",
-                )
-            # Default: return JSON (for application/json, */*, or missing header)
-            return Response(
-                content={"signature": full_signature},
-                status_code=HTTP_200_OK,
-                media_type="application/json",
             )
         except SignerError as e:
             raise NotFoundException(detail=str(e)) from e
@@ -431,6 +535,24 @@ class SigningController(Controller):  # type: ignore[misc]
                 status_code=HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Signing failed: {e}",
             ) from e
+
+        # Build response
+        signature_hex = signature.to_bytes().hex()
+        full_signature = f"0x{signature_hex}"
+
+        accept_header = request.headers.get("Accept", "")
+        if accept_header == "text/plain":
+            return Response(
+                content=full_signature,
+                status_code=HTTP_200_OK,
+                media_type="text/plain",
+            )
+
+        return Response(
+            content={"signature": full_signature},
+            status_code=HTTP_200_OK,
+            media_type="application/json",
+        )
 
 
 # Router configuration
