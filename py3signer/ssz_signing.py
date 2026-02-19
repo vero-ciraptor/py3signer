@@ -4,8 +4,6 @@ This module implements SSZ serialization and signing root computation
 for Ethereum Remote Signing API requests.
 """
 
-from typing import Any
-
 from ssz import get_hash_tree_root
 from ssz.sedes import (
     Container,
@@ -16,31 +14,20 @@ from ssz.sedes import (
 )
 
 from .signing_types import (
-    DOMAIN_AGGREGATE_AND_PROOF,
-    DOMAIN_APPLICATION_MASK,
-    DOMAIN_BEACON_ATTESTER,
-    DOMAIN_BEACON_PROPOSER,
-    DOMAIN_CONTRIBUTION_AND_PROOF,
-    DOMAIN_DEPOSIT,
-    DOMAIN_RANDAO,
-    DOMAIN_SELECTION_PROOF,
-    DOMAIN_SYNC_COMMITTEE,
-    DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF,
-    DOMAIN_VOLUNTARY_EXIT,
-    SignRequest,
-    AggregationSlotSignRequest,
     AggregateAndProofSignRequest,
     AggregateAndProofV2SignRequest,
+    AggregationSlotSignRequest,
     AttestationSignRequest,
     BlockSignRequest,
     BlockV2SignRequest,
     DepositSignRequest,
     RandaoRevealSignRequest,
-    VoluntaryExitSignRequest,
+    SignRequest,
+    SyncCommitteeContributionAndProofSignRequest,
     SyncCommitteeMessageSignRequest,
     SyncCommitteeSelectionProofSignRequest,
-    SyncCommitteeContributionAndProofSignRequest,
     ValidatorRegistrationSignRequest,
+    VoluntaryExitSignRequest,
 )
 
 
@@ -113,6 +100,7 @@ def _compute_sync_committee_message_root(
         validator_index: uint64
     }
     """
+
     # Sync committee message SSZ structure
     class SyncCommitteeMessage(Container):  # type: ignore[misc]
         fields = [
@@ -141,6 +129,7 @@ def _compute_sync_committee_selection_proof_root(
         subcommittee_index: uint64
     }
     """
+
     class SyncAggregatorSelectionData(Container):  # type: ignore[misc]
         fields = [
             ("slot", uint64),
@@ -171,6 +160,7 @@ def _compute_attestation_root(request: AttestationSignRequest) -> bytes:
         root: bytes32
     }
     """
+
     class Checkpoint(Container):  # type: ignore[misc]
         fields = [
             ("epoch", uint64),
@@ -222,6 +212,7 @@ def _compute_voluntary_exit_root(request: VoluntaryExitSignRequest) -> bytes:
         validator_index: uint64
     }
     """
+
     class VoluntaryExit(Container):  # type: ignore[misc]
         fields = [
             ("epoch", uint64),
@@ -246,6 +237,7 @@ def _compute_deposit_root(request: DepositSignRequest) -> bytes:
         amount: uint64
     }
     """
+
     class DepositMessage(Container):  # type: ignore[misc]
         fields = [
             ("pubkey", Vector(UInt(8), 48)),
@@ -276,6 +268,7 @@ def _compute_validator_registration_root(request: ValidatorRegistrationSignReque
         pubkey: bytes48
     }
     """
+
     class ValidatorRegistration(Container):  # type: ignore[misc]
         fields = [
             ("fee_recipient", Vector(UInt(8), 20)),
