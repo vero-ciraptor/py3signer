@@ -222,6 +222,6 @@ def get_config() -> Config:
     try:
         config = msgspec.convert(config_dict, Config)
     except msgspec.ValidationError as e:
-        raise ValueError(f"Configuration validation error: {e}")
+        raise ValueError(f"Configuration validation error: {e!r}") from e
 
     return config

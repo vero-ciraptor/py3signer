@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+import msgspec
 import pytest
 
 from py3signer.keystore import Keystore, KeystoreError
@@ -23,7 +24,7 @@ class TestKeystore:
 
     def test_from_json_invalid(self) -> None:
         """Test loading invalid JSON."""
-        with pytest.raises(KeystoreError) as exc_info:
+        with pytest.raises(msgspec.DecodeError, match="JSON is malformed") as exc_info:
             Keystore.from_json("not valid json")
         assert "Invalid JSON" in str(exc_info.value)
 

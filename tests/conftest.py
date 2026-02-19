@@ -68,7 +68,7 @@ def sample_keystore() -> dict[str, Any]:
     """
     # Load the pre-generated scrypt keystore from test data
     keystore_path = Path(__file__).parent / "data" / "test_keystore_scrypt.json"
-    with open(keystore_path) as f:
+    with keystore_path.open() as f:
         data: dict[str, Any] = json.load(f)
         return data
 

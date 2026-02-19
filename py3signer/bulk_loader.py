@@ -74,7 +74,7 @@ def load_keystore_with_password(
     try:
         password = password_path.read_text().strip()
     except Exception as e:
-        raise KeystoreError(f"Failed to read password file: {e}")
+        raise KeystoreError(f"Failed to read password file: {e!r}") from e
 
     # Decrypt keystore
     secret_key = keystore.decrypt(password)

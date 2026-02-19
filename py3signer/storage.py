@@ -1,7 +1,6 @@
 """In-memory key storage with optional disk persistence."""
 
 import logging
-import os
 import tempfile
 from contextlib import suppress
 from dataclasses import dataclass
@@ -61,7 +60,6 @@ class KeyStorage:
         self._keystore_path.mkdir(parents=True, exist_ok=True)
 
         keystore_temp = password_temp = None
-
         try:
             # Atomic writes using temp files
             with tempfile.NamedTemporaryFile(
@@ -82,12 +80,8 @@ class KeyStorage:
                 f.write(password)
                 password_temp = Path(f.name)
 
-            os.rename(keystore_temp, keystore_file)
-            os.rename(password_temp, password_file)
-
-            logger.info(f"Saved keystore to disk: {keystore_file.name}")
-            return True
-
+            keystore_temp.rename(keystore_file)
+            password_temp.rename(password_file)
         except Exception as e:
             logger.exception(f"Failed to save keystore to disk: {e!r}")
             # Cleanup temp files
@@ -96,6 +90,9 @@ class KeyStorage:
                     with suppress(OSError):
                         temp.unlink()
             return False
+        else:
+            logger.info(f"Saved keystore to disk: {keystore_file.name}")
+            return True
 
     def _delete_from_disk(self, pubkey_hex: str) -> bool:
         """Delete keystore and password files from disk."""

@@ -423,4 +423,4 @@ def validate_signing_root(signing_root: str | None) -> bytes | None:
     try:
         return bytes.fromhex(signing_root_clean)
     except ValueError as e:
-        raise ValueError(f"signing_root must be valid hexadecimal: {e}")
+        raise ValueError(f"signing_root must be valid hexadecimal: {e}") from e

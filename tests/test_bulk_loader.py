@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 
+import msgspec
 import pytest
 
 from py3signer.bulk_loader import (
@@ -133,7 +134,7 @@ class TestLoadKeystoreWithPassword:
         password_path = tmp_path / "invalid.txt"
         password_path.write_text("password")
 
-        with pytest.raises(KeystoreError):
+        with pytest.raises(msgspec.DecodeError, match="JSON is malformed"):
             load_keystore_with_password(keystore_path, password_path)
 
 
@@ -265,6 +266,9 @@ class TestBulkLoaderIntegration:
         # This will fail to decrypt but that's expected - we're testing the flow
         storage = KeyStorage()
         success, failures = load_keystores_from_directory(tmp_path, storage)
+
+        # TODO there is some weirdness here
+        assert failures == 3
 
         # All will fail due to pubkey mismatch or decryption failure
         # but the scanner should find them

@@ -21,10 +21,10 @@ def main() -> None:
     try:
         config = get_config()
     except FileNotFoundError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        print(f"Error: {e}", file=sys.stderr)  # noqa: T201
         sys.exit(1)
     except ValueError as e:
-        print(f"Error: {e}", file=sys.stderr)
+        print(f"Error: {e}", file=sys.stderr)  # noqa: T201
         sys.exit(1)
 
     setup_logging(config.normalized_log_level)
@@ -32,7 +32,7 @@ def main() -> None:
     try:
         asyncio.run(run_server(config))
     except KeyboardInterrupt:
-        print("\nShutting down...")
+        logging.getLogger(__name__).info("\nShutting down...")
         sys.exit(0)
     except Exception:
         logging.getLogger(__name__).exception("Server error")

@@ -37,7 +37,7 @@ async def test_health_endpoint(client: AsyncTestClient) -> None:
 
 
 @pytest.mark.parametrize(
-    "endpoint,extract_key",
+    ("endpoint", "extract_key"),
     [
         ("/eth/v1/keystores", "data"),
         ("/api/v1/eth2/publicKeys", None),
@@ -71,7 +71,7 @@ async def test_import_keystore_invalid_json(client: AsyncTestClient) -> None:
 
 
 @pytest.mark.parametrize(
-    "keystores,passwords,expected_error",
+    ("keystores", "passwords", "expected_error"),
     [
         (
             ["keystore1"],
@@ -389,7 +389,7 @@ async def test_import_duplicate_keystore(
 
 
 @pytest.mark.parametrize(
-    "request_body,expected_error",
+    ("request_body", "expected_error"),
     [
         # Missing type discriminator
         ({}, "missing required field `type`"),

@@ -58,10 +58,11 @@ class Signer:
 
         try:
             signature = sign(secret_key, data, domain)
+        except Exception as e:
+            SIGNING_ERRORS_TOTAL.labels(error_type="signing_failed").inc()
+            raise SignerError(f"Signing failed: {e}") from e
+        else:
             duration = time.perf_counter() - start_time
             SIGNING_DURATION_SECONDS.labels(key_type="bls").observe(duration)
             logger.debug(f"Signed data with key: {pubkey_hex[:20]}...")
             return signature
-        except Exception as e:
-            SIGNING_ERRORS_TOTAL.labels(error_type="signing_failed").inc()
-            raise SignerError(f"Signing failed: {e}")

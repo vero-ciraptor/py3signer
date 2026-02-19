@@ -209,7 +209,9 @@ class KeystoreController(Controller):  # type: ignore[misc]
         existing_keys = {k[0] for k in storage.list_keys()}
         persistence_enabled = storage.keystore_path is not None
 
-        for keystore_json, password in zip(import_req.keystores, import_req.passwords):
+        for keystore_json, password in zip(
+            import_req.keystores, import_req.passwords, strict=True
+        ):
             try:
                 keystore = Keystore.from_json(keystore_json)
                 secret_key = keystore.decrypt(password)

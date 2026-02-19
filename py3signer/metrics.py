@@ -133,7 +133,7 @@ class MetricsServer:
         class MetricsHandler(BaseHTTPRequestHandler):
             """HTTP handler for metrics endpoint."""
 
-            def log_message(self, format: str, *args: object) -> None:
+            def log_message(self, _format: str, *args: object) -> None:
                 # Suppress default logging
                 pass
 

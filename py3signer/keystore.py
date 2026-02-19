@@ -1,10 +1,9 @@
 """EIP-2335 keystore handling."""
 
-import json
 import logging
 import unicodedata
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 import msgspec
 from py3signer_core import SecretKey, decrypt_keystore
@@ -77,29 +76,14 @@ class Keystore(msgspec.Struct):
             raise KeystoreError("Invalid crypto structure")
 
     @classmethod
-    def from_file(cls, path: Path) -> Keystore:
+    def from_file(cls, path: Path) -> Self:
         """Load keystore from JSON file."""
-        try:
-            with open(path) as f:
-                data = json.load(f)
-            return cls(**data)
-        except json.JSONDecodeError as e:
-            raise KeystoreError(f"Invalid JSON: {e}")
-        except FileNotFoundError:
-            raise KeystoreError(f"Keystore file not found: {path}")
-        except msgspec.ValidationError as e:
-            raise KeystoreError(f"Invalid keystore structure: {e}")
+        return msgspec.json.decode(path.read_bytes(), type=cls)
 
     @classmethod
-    def from_json(cls, json_str: str) -> Keystore:
+    def from_json(cls, json_str: str) -> Self:
         """Load keystore from JSON string."""
-        try:
-            data = json.loads(json_str)
-            return cls(**data)
-        except json.JSONDecodeError as e:
-            raise KeystoreError(f"Invalid JSON: {e}")
-        except msgspec.ValidationError as e:
-            raise KeystoreError(f"Invalid keystore structure: {e}")
+        return msgspec.json.decode(json_str, type=cls)
 
     def decrypt(self, password: str) -> SecretKey:
         """Decrypt the keystore and return the secret key."""
@@ -107,19 +91,9 @@ class Keystore(msgspec.Struct):
             # Apply EIP-2335 password normalization
             normalized_password = normalize_password(password)
 
-            # Convert struct to dict for the decrypt_keystore function
-            data = msgspec.to_builtins(self)
-            json_str = json.dumps(data)
+            # Convert struct to JSON for the decrypt_keystore function
+            json_str = msgspec.json.encode(self).decode()
             secret_bytes = decrypt_keystore(json_str, normalized_password)
-
-            # Convert list to bytes if necessary (Rust returns Vec<u8> as list)
-            if isinstance(secret_bytes, list):
-                secret_bytes = bytes(secret_bytes)
-
-            if len(secret_bytes) != 32:
-                raise KeystoreError(f"Invalid secret key length: {len(secret_bytes)}")
-
-            return SecretKey.from_bytes(secret_bytes)
         except Exception as e:
             error_msg = str(e).lower()
             if (
@@ -129,3 +103,8 @@ class Keystore(msgspec.Struct):
             ):
                 raise KeystoreError("Invalid password") from e
             raise KeystoreError(f"Decryption failed: {e}") from e
+        else:
+            if len(secret_bytes) != 32:
+                raise KeystoreError(f"Invalid secret key length: {len(secret_bytes)}")
+
+            return SecretKey.from_bytes(secret_bytes)
