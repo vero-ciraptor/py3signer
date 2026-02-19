@@ -1,39 +1,36 @@
 """Tests for Prometheus metrics functionality."""
 
 from collections.abc import AsyncGenerator
-from typing import Any
 
 import pytest
-from aiohttp.test_utils import TestClient, TestServer
+from litestar import Litestar
+from litestar.testing import AsyncTestClient
 
 from py3signer import metrics
-from py3signer.metrics import MetricsServer, create_metrics_app
+from py3signer.metrics import MetricsController
 from py3signer.storage import KeyStorage
 
 
 @pytest.fixture
-async def metrics_client() -> AsyncGenerator[TestClient[Any, Any], None]:
+async def metrics_client() -> AsyncGenerator[AsyncTestClient, None]:
     """Create a test client for metrics server."""
-    app = create_metrics_app()
-    server = TestServer(app)
-    client = TestClient(server)
-    await client.start_server()
-    yield client
-    await client.close()
+    app = Litestar(route_handlers=[MetricsController], debug=False)
+    async with AsyncTestClient(app) as client:
+        yield client
 
 
 @pytest.mark.asyncio
 async def test_metrics_endpoint_returns_prometheus_format(
-    metrics_client: TestClient[Any, Any],
+    metrics_client: AsyncTestClient,
 ) -> None:
     """Test that /metrics endpoint returns Prometheus format."""
     resp = await metrics_client.get("/metrics")
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    content_type = resp.content_type
+    content_type = resp.headers.get("content-type", "")
     assert "text/plain" in content_type
 
-    text = await resp.text()
+    text = resp.text
     # Check for expected metrics
     assert "py3signer_build_info" in text
     assert "signing_requests_total" in text
@@ -45,23 +42,23 @@ async def test_metrics_endpoint_returns_prometheus_format(
 
 
 @pytest.mark.asyncio
-async def test_metrics_endpoint_health(metrics_client: TestClient[Any, Any]) -> None:
+async def test_metrics_endpoint_health(metrics_client: AsyncTestClient) -> None:
     """Test metrics server health endpoint."""
     resp = await metrics_client.get("/health")
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    data = await resp.json()
+    data = resp.json()
     assert data["status"] == "healthy"
 
 
 @pytest.mark.asyncio
-async def test_keys_loaded_gauge(metrics_client: TestClient[Any, Any]) -> None:
+async def test_keys_loaded_gauge(metrics_client: AsyncTestClient) -> None:
     """Test that keys_loaded gauge reflects key count."""
     # Start fresh with 0 keys
     metrics.KEYS_LOADED.set(0)
 
     resp = await metrics_client.get("/metrics")
-    text = await resp.text()
+    text = resp.text
     assert "keys_loaded 0.0" in text
 
     # Create storage and add keys
@@ -76,7 +73,7 @@ async def test_keys_loaded_gauge(metrics_client: TestClient[Any, Any]) -> None:
 
     # Check gauge updated
     resp = await metrics_client.get("/metrics")
-    text = await resp.text()
+    text = resp.text
     assert "keys_loaded 3.0" in text
 
     # Remove a key
@@ -85,43 +82,11 @@ async def test_keys_loaded_gauge(metrics_client: TestClient[Any, Any]) -> None:
 
     # Check gauge updated
     resp = await metrics_client.get("/metrics")
-    text = await resp.text()
+    text = resp.text
     assert "keys_loaded 2.0" in text
 
     # Cleanup
     storage.clear()
-
-
-@pytest.mark.asyncio
-async def test_metrics_server_start_stop() -> None:
-    """Test metrics server can start and stop."""
-    server = MetricsServer(host="127.0.0.1", port=18081)
-
-    # Start server
-    await server.start()
-
-    # Verify it's running by making a request
-    import aiohttp
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get("http://127.0.0.1:18081/metrics") as resp:
-            assert resp.status == 200
-            text = await resp.text()
-            assert "py3signer_build_info" in text
-
-    # Stop server
-    await server.stop()
-
-
-@pytest.mark.asyncio
-async def test_metrics_server_context_manager() -> None:
-    """Test metrics server context manager."""
-    import aiohttp
-
-    async with MetricsServer(host="127.0.0.1", port=18082) as _server:
-        async with aiohttp.ClientSession() as session:
-            async with session.get("http://127.0.0.1:18082/metrics") as resp:
-                assert resp.status == 200
 
 
 def test_metrics_content_type() -> None:

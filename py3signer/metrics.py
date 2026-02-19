@@ -1,4 +1,4 @@
-"""Prometheus metrics for py3signer.
+"""Prometheus metrics for py3signer with Litestar.
 
 This module defines and exposes all Prometheus metrics used by py3signer.
 Metrics are opt-in and only collected when --metrics-enabled is set.
@@ -6,9 +6,10 @@ Metrics are opt-in and only collected when --metrics-enabled is set.
 
 import logging
 import time
-from collections.abc import Awaitable, Callable
+from typing import Any
 
-from aiohttp import web
+from litestar import Controller, get
+from litestar.response import Response
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
@@ -89,100 +90,51 @@ def get_metrics_content_type() -> str:
     return CONTENT_TYPE_LATEST
 
 
-# HTTP middleware for tracking metrics
+# Litestar middleware for tracking metrics
 
 
-@web.middleware
-async def metrics_middleware(
-    request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
-) -> web.StreamResponse:
+class PrometheusMiddleware:
     """Middleware to track HTTP request metrics."""
-    start_time = time.perf_counter()
-    status = "500"
 
-    try:
-        response = await handler(request)
-        status = str(response.status)
-        return response
-    except web.HTTPException as e:
-        status = str(e.status)
-        raise
-    finally:
-        duration = time.perf_counter() - start_time
+    async def __call__(self, request: Any, handler: Any) -> Any:
+        """Process request and track metrics."""
+        start_time = time.perf_counter()
+        method = request.method
+        endpoint = request.url.path
+        status = "500"
 
-        # Get the route path pattern if available
-        if request.match_info.route and request.match_info.route.resource:
-            endpoint = request.match_info.route.resource.canonical
-        else:
-            # Fallback: sanitize path to prevent high cardinality
-            endpoint = request.path
-            parts = endpoint.rstrip("/").split("/")
-            if parts and len(parts[-1]) > 20:
-                parts[-1] = "{identifier}"
-                endpoint = "/".join(parts)
+        try:
+            response = await handler(request)
+            status = str(response.status_code)
+            return response
+        except Exception as e:
+            # Try to get status from exception
+            if hasattr(e, "status_code"):
+                status = str(e.status_code)
+            raise
+        finally:
+            duration = time.perf_counter() - start_time
+            HTTP_REQUEST_DURATION_SECONDS.labels(method=method, endpoint=endpoint).observe(duration)
+            HTTP_REQUESTS_TOTAL.labels(method=method, endpoint=endpoint, status=status).inc()
 
-        HTTP_REQUEST_DURATION_SECONDS.labels(method=request.method, endpoint=endpoint).observe(
-            duration
+
+# Metrics HTTP controller
+
+
+class MetricsController(Controller):  # type: ignore[misc]
+    """Prometheus metrics HTTP endpoints."""
+
+    path = "/"
+
+    @get("/metrics")  # type: ignore[untyped-decorator]
+    async def metrics(self) -> Response:
+        """Handler for the /metrics endpoint."""
+        return Response(
+            content=get_metrics_output(),
+            headers={"Content-Type": get_metrics_content_type()},
         )
-        HTTP_REQUESTS_TOTAL.labels(method=request.method, endpoint=endpoint, status=status).inc()
 
-
-def setup_metrics_middleware(app: web.Application) -> None:
-    """Add metrics middleware to the application."""
-    app.middlewares.append(metrics_middleware)
-
-
-# Metrics HTTP server
-
-
-async def metrics_handler(request: web.Request) -> web.Response:
-    """Handler for the /metrics endpoint."""
-    return web.Response(
-        body=get_metrics_output(), headers={"Content-Type": get_metrics_content_type()}
-    )
-
-
-async def metrics_health_handler(request: web.Request) -> web.Response:
-    """Health check for metrics server."""
-    return web.json_response({"status": "healthy"})
-
-
-def create_metrics_app() -> web.Application:
-    """Create the metrics application."""
-    app = web.Application()
-    app.router.add_get("/metrics", metrics_handler)
-    app.router.add_get("/health", metrics_health_handler)
-    return app
-
-
-class MetricsServer:
-    """Prometheus metrics HTTP server."""
-
-    def __init__(self, host: str = "127.0.0.1", port: int = 8081) -> None:
-        self._host = host
-        self._port = port
-        self._runner: web.AppRunner | None = None
-
-    async def start(self) -> None:
-        """Start the metrics server."""
-        app = create_metrics_app()
-        self._runner = web.AppRunner(app)
-        await self._runner.setup()
-
-        site = web.TCPSite(self._runner, host=self._host, port=self._port)
-        await site.start()
-
-        logger.info(f"Metrics server running at http://{self._host}:{self._port}/metrics")
-
-    async def stop(self) -> None:
-        """Stop the metrics server."""
-        if self._runner:
-            await self._runner.cleanup()
-            logger.info("Metrics server stopped")
-
-    async def __aenter__(self) -> "MetricsServer":
-        await self.start()
-        return self
-
-    async def __aexit__(self, *args: object) -> None:
-        await self.stop()
+    @get("/health")  # type: ignore[untyped-decorator]
+    async def health(self) -> dict[str, str]:
+        """Health check for metrics server."""
+        return {"status": "healthy"}

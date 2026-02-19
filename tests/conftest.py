@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from aiohttp.test_utils import TestClient, TestServer
+from litestar.testing import AsyncTestClient
 
 from py3signer.config import Config
 from py3signer.server import create_app
@@ -36,33 +36,27 @@ def storage() -> Generator[KeyStorage, None, None]:
 
 
 @pytest.fixture
-async def client(config: Config) -> AsyncGenerator[TestClient[Any, Any], None]:
+async def client(config: Config) -> AsyncGenerator[AsyncTestClient, None]:
     """Create a test client."""
     app = create_app(config)
-    server = TestServer(app)
-    client = TestClient(server)
-    await client.start_server()
-    yield client
-    await client.close()
+    async with AsyncTestClient(app) as client:
+        yield client
 
 
 @pytest.fixture
 async def client_with_persistence(
     config_with_keystore_path: Config,
-) -> AsyncGenerator[TestClient[Any, Any], None]:
+) -> AsyncGenerator[AsyncTestClient, None]:
     """Create a test client with keystore persistence enabled."""
     app = create_app(config_with_keystore_path)
-    server = TestServer(app)
-    client = TestClient(server)
-    await client.start_server()
-    yield client
-    await client.close()
+    async with AsyncTestClient(app) as client:
+        yield client
 
 
 @pytest.fixture
 async def client_with_input_only_keystores(
     tmp_path: Path,
-) -> AsyncGenerator[TestClient[Any, Any], None]:
+) -> AsyncGenerator[AsyncTestClient, None]:
     """Create a test client with input-only keystores configured."""
     keystores_dir = tmp_path / "input_keystores"
     passwords_dir = tmp_path / "input_passwords"
@@ -91,17 +85,14 @@ async def client_with_input_only_keystores(
     )
 
     app = create_app(config)
-    server = TestServer(app)
-    client = TestClient(server)
-    await client.start_server()
-    yield client
-    await client.close()
+    async with AsyncTestClient(app) as client:
+        yield client
 
 
 @pytest.fixture
 async def client_with_both_keystore_types(
     tmp_path: Path,
-) -> AsyncGenerator[TestClient[Any, Any], None]:
+) -> AsyncGenerator[AsyncTestClient, None]:
     """Create a test client with both persistent and input-only keystores."""
     # Persistent keystores
     key_store_dir = tmp_path / "keystore_store"
@@ -144,11 +135,8 @@ async def client_with_both_keystore_types(
     )
 
     app = create_app(config)
-    server = TestServer(app)
-    client = TestClient(server)
-    await client.start_server()
-    yield client
-    await client.close()
+    async with AsyncTestClient(app) as client:
+        yield client
 
 
 @pytest.fixture

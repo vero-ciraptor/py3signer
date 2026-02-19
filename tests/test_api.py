@@ -4,9 +4,10 @@ import json
 from typing import Any
 
 import pytest
-from aiohttp.test_utils import TestClient
+from litestar.testing import AsyncTestClient
 
 from py3signer.config import Config
+from py3signer.server import create_app
 
 
 # Valid fork info fixture for tests
@@ -20,12 +21,12 @@ def valid_fork_info() -> dict[str, Any]:
 
 
 @pytest.mark.asyncio
-async def test_health_endpoint(client: TestClient[Any, Any]) -> None:
+async def test_health_endpoint(client: AsyncTestClient) -> None:
     """Test the health check endpoint."""
     resp = await client.get("/health")
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    data = await resp.json()
+    data = resp.json()
     assert data["status"] == "healthy"
     assert "keys_loaded" in data
     assert data["keys_loaded"] == 0
@@ -39,26 +40,24 @@ async def test_health_endpoint(client: TestClient[Any, Any]) -> None:
     ],
 )
 @pytest.mark.asyncio
-async def test_list_empty(
-    client: TestClient[Any, Any], endpoint: str, extract_key: str | None
-) -> None:
+async def test_list_empty(client: AsyncTestClient, endpoint: str, extract_key: str | None) -> None:
     """Test listing endpoints when none are loaded."""
     resp = await client.get(endpoint)
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    data = await resp.json()
+    data = resp.json()
     if extract_key:
         data = data.get(extract_key)
     assert data == []
 
 
 @pytest.mark.asyncio
-async def test_import_keystore_invalid_json(client: TestClient[Any, Any]) -> None:
+async def test_import_keystore_invalid_json(client: AsyncTestClient) -> None:
     """Test importing with invalid JSON."""
     resp = await client.post(
-        "/eth/v1/keystores", data="not json", headers={"Content-Type": "application/json"}
+        "/eth/v1/keystores", content="not json", headers={"Content-Type": "application/json"}
     )
-    assert resp.status == 400
+    assert resp.status_code == 400
 
 
 @pytest.mark.parametrize(
@@ -70,21 +69,21 @@ async def test_import_keystore_invalid_json(client: TestClient[Any, Any]) -> Non
 )
 @pytest.mark.asyncio
 async def test_import_keystore_validation_errors(
-    client: TestClient[Any, Any], keystores: list[str], passwords: list[str], expected_error: str
+    client: AsyncTestClient, keystores: list[str], passwords: list[str], expected_error: str
 ) -> None:
     """Test importing with various validation errors."""
     resp = await client.post(
         "/eth/v1/keystores", json={"keystores": keystores, "passwords": passwords}
     )
-    assert resp.status == 400
+    assert resp.status_code == 400
 
-    data = await resp.json()
-    assert "error" in data
+    data = resp.json()
+    assert "detail" in data or "error" in data
 
 
 @pytest.mark.asyncio
 async def test_import_keystore_success(
-    client: TestClient[Any, Any], sample_keystore: dict[str, Any], sample_keystore_password: str
+    client: AsyncTestClient, sample_keystore: dict[str, Any], sample_keystore_password: str
 ) -> None:
     """Test successful keystore import."""
     keystore_json = json.dumps(sample_keystore)
@@ -93,16 +92,16 @@ async def test_import_keystore_success(
         "/eth/v1/keystores",
         json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
     )
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    data = await resp.json()
+    data = resp.json()
     assert len(data["data"]) == 1
     assert data["data"][0]["status"] == "imported"
 
 
 @pytest.mark.asyncio
 async def test_import_keystore_wrong_password(
-    client: TestClient[Any, Any], sample_keystore: dict[str, Any]
+    client: AsyncTestClient, sample_keystore: dict[str, Any]
 ) -> None:
     """Test importing with wrong password."""
     keystore_json = json.dumps(sample_keystore)
@@ -110,15 +109,15 @@ async def test_import_keystore_wrong_password(
     resp = await client.post(
         "/eth/v1/keystores", json={"keystores": [keystore_json], "passwords": ["wrongpassword"]}
     )
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    data = await resp.json()
+    data = resp.json()
     assert data["data"][0]["status"] == "error"
 
 
 @pytest.mark.asyncio
 async def test_list_keystores_after_import(
-    client: TestClient[Any, Any], sample_keystore: dict[str, Any], sample_keystore_password: str
+    client: AsyncTestClient, sample_keystore: dict[str, Any], sample_keystore_password: str
 ) -> None:
     """Test listing keystores after importing."""
     # First import a keystore
@@ -130,9 +129,9 @@ async def test_list_keystores_after_import(
 
     # Then list
     resp = await client.get("/eth/v1/keystores")
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    data = await resp.json()
+    data = resp.json()
     assert len(data["data"]) == 1
     assert data["data"][0]["validating_pubkey"] == sample_keystore["pubkey"]
     assert data["data"][0]["derivation_path"] == sample_keystore["path"]
@@ -140,7 +139,7 @@ async def test_list_keystores_after_import(
 
 @pytest.mark.asyncio
 async def test_delete_keystore(
-    client: TestClient[Any, Any], sample_keystore: dict[str, Any], sample_keystore_password: str
+    client: AsyncTestClient, sample_keystore: dict[str, Any], sample_keystore_password: str
 ) -> None:
     """Test deleting a keystore."""
     # First import
@@ -151,54 +150,58 @@ async def test_delete_keystore(
     )
 
     # Then delete
-    resp = await client.delete("/eth/v1/keystores", json={"pubkeys": [sample_keystore["pubkey"]]})
-    assert resp.status == 200
+    resp = await client.request(
+        "DELETE", "/eth/v1/keystores", content=json.dumps({"pubkeys": [sample_keystore["pubkey"]]})
+    )
+    assert resp.status_code == 200
 
-    data = await resp.json()
+    data = resp.json()
     assert data["data"][0]["status"] == "deleted"
 
     # Verify it's gone
     resp = await client.get("/eth/v1/keystores")
-    data = await resp.json()
+    data = resp.json()
     assert len(data["data"]) == 0
 
 
 @pytest.mark.asyncio
-async def test_delete_nonexistent_keystore(client: TestClient[Any, Any]) -> None:
+async def test_delete_nonexistent_keystore(client: AsyncTestClient) -> None:
     """Test deleting a keystore that doesn't exist."""
-    resp = await client.delete("/eth/v1/keystores", json={"pubkeys": ["a" * 96]})
-    assert resp.status == 200
+    resp = await client.request(
+        "DELETE", "/eth/v1/keystores", content=json.dumps({"pubkeys": ["a" * 96]})
+    )
+    assert resp.status_code == 200
 
-    data = await resp.json()
+    data = resp.json()
     assert data["data"][0]["status"] == "not_found"
 
 
 @pytest.mark.asyncio
-async def test_delete_empty_pubkeys(client: TestClient[Any, Any]) -> None:
+async def test_delete_empty_pubkeys(client: AsyncTestClient) -> None:
     """Test deleting with empty pubkeys array."""
-    resp = await client.delete("/eth/v1/keystores", json={"pubkeys": []})
-    assert resp.status == 400
+    resp = await client.request("DELETE", "/eth/v1/keystores", content=json.dumps({"pubkeys": []}))
+    assert resp.status_code == 400
 
 
 @pytest.mark.asyncio
-async def test_remote_keys_stub(client: TestClient[Any, Any]) -> None:
+async def test_remote_keys_stub(client: AsyncTestClient) -> None:
     """Test remote keys endpoints return stubs."""
     resp = await client.get("/eth/v1/remotekeys")
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    data = await resp.json()
+    data = resp.json()
     assert data["data"] == []
 
-    resp = await client.post("/eth/v1/remotekeys", json={})
-    assert resp.status == 501
+    resp = await client.post("/eth/v1/remotekeys")
+    assert resp.status_code == 501
 
-    resp = await client.delete("/eth/v1/remotekeys", json={})
-    assert resp.status == 501
+    resp = await client.delete("/eth/v1/remotekeys")
+    assert resp.status_code == 501
 
 
 @pytest.mark.asyncio
 async def test_list_public_keys_after_import(
-    client: TestClient[Any, Any], sample_keystore: dict[str, Any], sample_keystore_password: str
+    client: AsyncTestClient, sample_keystore: dict[str, Any], sample_keystore_password: str
 ) -> None:
     """Test listing public keys after importing keystores."""
     # First import a keystore
@@ -210,9 +213,9 @@ async def test_list_public_keys_after_import(
 
     # Then list public keys via Remote Signing API
     resp = await client.get("/api/v1/eth2/publicKeys")
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    data = await resp.json()
+    data = resp.json()
     assert len(data) == 1
     # API returns pubkey with "0x" prefix
     expected_pubkey = sample_keystore["pubkey"]
@@ -231,39 +234,31 @@ async def test_list_public_keys_after_import(
 @pytest.mark.asyncio
 async def test_auth_token_required(endpoint: str) -> None:
     """Test that auth token is required when configured."""
-    from aiohttp.test_utils import TestClient as AiohttpTestClient
-    from aiohttp.test_utils import TestServer
-
-    from py3signer.server import create_app
+    from litestar.testing import AsyncTestClient
 
     config = Config(host="127.0.0.1", port=8080, auth_token="secret_token")
 
     app = create_app(config)
-    server = TestServer(app)
-    client = AiohttpTestClient(server)
-    await client.start_server()
 
-    try:
+    async with AsyncTestClient(app) as client:
         # Request without auth should fail
         resp = await client.get(endpoint)
-        assert resp.status == 401
+        assert resp.status_code == 401
 
         # Request with wrong auth should fail
         resp = await client.get(endpoint, headers={"Authorization": "Bearer wrong_token"})
-        assert resp.status == 401
+        assert resp.status_code == 401
 
         # Request with correct auth should succeed
         resp = await client.get(endpoint, headers={"Authorization": "Bearer secret_token"})
-        assert resp.status == 200
-    finally:
-        await client.close()
+        assert resp.status_code == 200
 
 
 @pytest.mark.asyncio
-async def test_sign_missing_identifier(client: TestClient[Any, Any]) -> None:
+async def test_sign_missing_identifier(client: AsyncTestClient) -> None:
     """Test signing without identifier."""
     resp = await client.post("/api/v1/eth2/sign/", json={})
-    assert resp.status in [404, 405]  # Route not found or method not allowed
+    assert resp.status_code in [404, 405]  # Route not found or method not allowed
 
 
 # Keystore persistence tests
@@ -271,7 +266,7 @@ async def test_sign_missing_identifier(client: TestClient[Any, Any]) -> None:
 
 @pytest.mark.asyncio
 async def test_import_keystore_with_persistence(
-    client_with_persistence: TestClient[Any, Any],
+    client_with_persistence: AsyncTestClient,
     sample_keystore: dict[str, Any],
     sample_keystore_password: str,
 ) -> None:
@@ -283,9 +278,9 @@ async def test_import_keystore_with_persistence(
         "/eth/v1/keystores",
         json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
     )
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    data = await resp.json()
+    data = resp.json()
     assert len(data["data"]) == 1
     assert data["data"][0]["status"] == "imported"
 
@@ -295,7 +290,7 @@ async def test_import_keystore_with_persistence(
 
 @pytest.mark.asyncio
 async def test_delete_keystore_with_persistence(
-    client_with_persistence: TestClient[Any, Any],
+    client_with_persistence: AsyncTestClient,
     sample_keystore: dict[str, Any],
     sample_keystore_password: str,
 ) -> None:
@@ -309,19 +304,21 @@ async def test_delete_keystore_with_persistence(
         "/eth/v1/keystores",
         json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
     )
-    assert resp.status == 200
+    assert resp.status_code == 200
 
     # Then delete
-    resp = await client_with_persistence.delete("/eth/v1/keystores", json={"pubkeys": [pubkey]})
-    assert resp.status == 200
+    resp = await client_with_persistence.request(
+        "DELETE", "/eth/v1/keystores", content=json.dumps({"pubkeys": [pubkey]})
+    )
+    assert resp.status_code == 200
 
-    data = await resp.json()
+    data = resp.json()
     assert data["data"][0]["status"] == "deleted"
 
 
 @pytest.mark.asyncio
 async def test_import_duplicate_keystore(
-    client: TestClient[Any, Any], sample_keystore: dict[str, Any], sample_keystore_password: str
+    client: AsyncTestClient, sample_keystore: dict[str, Any], sample_keystore_password: str
 ) -> None:
     """Test that importing a duplicate keystore returns proper error."""
     keystore_json = json.dumps(sample_keystore)
@@ -331,17 +328,17 @@ async def test_import_duplicate_keystore(
         "/eth/v1/keystores",
         json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
     )
-    assert resp.status == 200
-    assert (await resp.json())["data"][0]["status"] == "imported"
+    assert resp.status_code == 200
+    assert resp.json()["data"][0]["status"] == "imported"
 
     # Try to import again
     resp = await client.post(
         "/eth/v1/keystores",
         json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
     )
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    data = await resp.json()
+    data = resp.json()
     assert data["data"][0]["status"] == "duplicate"
 
 
@@ -370,7 +367,7 @@ async def test_import_duplicate_keystore(
 )
 @pytest.mark.asyncio
 async def test_sign_validation_errors(
-    client: TestClient[Any, Any],
+    client: AsyncTestClient,
     valid_fork_info: dict[str, Any],
     request_body: dict[str, Any],
     expected_error: str,
@@ -382,16 +379,14 @@ async def test_sign_validation_errors(
 
     pubkey = "a" * 96
     resp = await client.post(f"/api/v1/eth2/sign/{pubkey}", json=request_body)
-    assert resp.status == 400
+    assert resp.status_code == 400
 
-    data = await resp.json()
-    assert "error" in data
+    data = resp.json()
+    assert "detail" in data or "error" in data
 
 
 @pytest.mark.asyncio
-async def test_sign_key_not_found(
-    client: TestClient[Any, Any], valid_fork_info: dict[str, Any]
-) -> None:
+async def test_sign_key_not_found(client: AsyncTestClient, valid_fork_info: dict[str, Any]) -> None:
     """Test signing with non-existent key."""
     pubkey = "a" * 96
     resp = await client.post(
@@ -409,12 +404,12 @@ async def test_sign_key_not_found(
             },
         },
     )
-    assert resp.status == 404
+    assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
 async def test_sign_missing_signing_root(
-    client: TestClient[Any, Any], valid_fork_info: dict[str, Any]
+    client: AsyncTestClient, valid_fork_info: dict[str, Any]
 ) -> None:
     """Test signing without signing_root - returns error since SSZ computation is not implemented."""
     pubkey = "a" * 96
@@ -432,15 +427,15 @@ async def test_sign_missing_signing_root(
             },
         },
     )
-    assert resp.status == 400
+    assert resp.status_code == 400
 
-    data = await resp.json()
-    assert "signing_root is required" in data["error"]
+    data = resp.json()
+    assert "signing_root is required" in data.get("detail", "")
 
 
 @pytest.mark.asyncio
 async def test_sign_attestation(
-    client: TestClient[Any, Any],
+    client: AsyncTestClient,
     sample_keystore: dict[str, Any],
     sample_keystore_password: str,
     valid_fork_info: dict[str, Any],
@@ -452,7 +447,7 @@ async def test_sign_attestation(
         "/eth/v1/keystores",
         json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
     )
-    assert resp.status == 200
+    assert resp.status_code == 200
     pubkey = sample_keystore["pubkey"]
 
     # Sign an attestation
@@ -471,9 +466,9 @@ async def test_sign_attestation(
             },
         },
     )
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    data = await resp.text()
+    data = resp.text
     # Response is now a plain hex string per Web3Signer API spec
     assert data.startswith("0x")
     assert len(data) == 194  # 0x + 96 bytes * 2 = 194
@@ -481,7 +476,7 @@ async def test_sign_attestation(
 
 @pytest.mark.asyncio
 async def test_sign_randao(
-    client: TestClient[Any, Any],
+    client: AsyncTestClient,
     sample_keystore: dict[str, Any],
     sample_keystore_password: str,
     valid_fork_info: dict[str, Any],
@@ -493,7 +488,7 @@ async def test_sign_randao(
         "/eth/v1/keystores",
         json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
     )
-    assert resp.status == 200
+    assert resp.status_code == 200
     pubkey = sample_keystore["pubkey"]
 
     # Sign a RANDAO reveal
@@ -506,9 +501,9 @@ async def test_sign_randao(
             "randao_reveal": {"epoch": "100"},
         },
     )
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    data = await resp.text()
+    data = resp.text
     # Response is now a plain hex string per Web3Signer API spec
     assert data.startswith("0x")
     assert len(data) == 194  # 0x + 96 bytes * 2 = 194
@@ -516,7 +511,7 @@ async def test_sign_randao(
 
 @pytest.mark.asyncio
 async def test_sign_voluntary_exit(
-    client: TestClient[Any, Any],
+    client: AsyncTestClient,
     sample_keystore: dict[str, Any],
     sample_keystore_password: str,
     valid_fork_info: dict[str, Any],
@@ -528,7 +523,7 @@ async def test_sign_voluntary_exit(
         "/eth/v1/keystores",
         json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
     )
-    assert resp.status == 200
+    assert resp.status_code == 200
     pubkey = sample_keystore["pubkey"]
 
     # Sign a voluntary exit
@@ -541,9 +536,9 @@ async def test_sign_voluntary_exit(
             "voluntary_exit": {"epoch": "100", "validator_index": "5"},
         },
     )
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    data = await resp.text()
+    data = resp.text
     # Response is now a plain hex string per Web3Signer API spec
     assert data.startswith("0x")
     assert len(data) == 194  # 0x + 96 bytes * 2 = 194
@@ -551,7 +546,7 @@ async def test_sign_voluntary_exit(
 
 @pytest.mark.asyncio
 async def test_sign_block_v2(
-    client: TestClient[Any, Any],
+    client: AsyncTestClient,
     sample_keystore: dict[str, Any],
     sample_keystore_password: str,
     valid_fork_info: dict[str, Any],
@@ -563,7 +558,7 @@ async def test_sign_block_v2(
         "/eth/v1/keystores",
         json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
     )
-    assert resp.status == 200
+    assert resp.status_code == 200
     pubkey = sample_keystore["pubkey"]
 
     # Sign a block v2
@@ -585,9 +580,9 @@ async def test_sign_block_v2(
             },
         },
     )
-    assert resp.status == 200
+    assert resp.status_code == 200
 
-    data = await resp.text()
+    data = resp.text
     # Response is now a plain hex string per Web3Signer API spec
     assert data.startswith("0x")
     assert len(data) == 194  # 0x + 96 bytes * 2 = 194
@@ -595,7 +590,7 @@ async def test_sign_block_v2(
 
 @pytest.mark.asyncio
 async def test_full_flow(
-    client: TestClient[Any, Any],
+    client: AsyncTestClient,
     sample_keystore: dict[str, Any],
     sample_keystore_password: str,
     valid_fork_info: dict[str, Any],
@@ -607,14 +602,14 @@ async def test_full_flow(
         "/eth/v1/keystores",
         json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
     )
-    assert resp.status == 200
-    data = await resp.json()
+    assert resp.status_code == 200
+    data = resp.json()
     assert data["data"][0]["status"] == "imported"
 
     # 2. List
     resp = await client.get("/eth/v1/keystores")
-    assert resp.status == 200
-    data = await resp.json()
+    assert resp.status_code == 200
+    data = resp.json()
     assert len(data["data"]) == 1
     pubkey = data["data"][0]["validating_pubkey"]
 
@@ -634,20 +629,22 @@ async def test_full_flow(
             },
         },
     )
-    assert resp.status == 200
-    data = await resp.text()
+    assert resp.status_code == 200
+    data = resp.text
     # Response is now a plain hex string per Web3Signer API spec
     assert data.startswith("0x")
     assert len(data) == 194  # 0x + 96 bytes * 2 = 194
 
     # 4. Delete
-    resp = await client.delete("/eth/v1/keystores", json={"pubkeys": [pubkey]})
-    assert resp.status == 200
-    data = await resp.json()
+    resp = await client.request(
+        "DELETE", "/eth/v1/keystores", content=json.dumps({"pubkeys": [pubkey]})
+    )
+    assert resp.status_code == 200
+    data = resp.json()
     assert data["data"][0]["status"] == "deleted"
 
     # 5. Verify deleted
     resp = await client.get("/eth/v1/keystores")
-    assert resp.status == 200
-    data = await resp.json()
+    assert resp.status_code == 200
+    data = resp.json()
     assert len(data["data"]) == 0

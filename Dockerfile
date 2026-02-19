@@ -64,7 +64,7 @@ COPY --from=builder /build/dist/*.whl /tmp/
 
 # Create virtual environment, install dependencies, clean up, and create cache directory
 RUN uv venv && \
-    uv pip install /tmp/*.whl "aiohttp>=3.11.0" "msgspec>=0.19.0" && \
+    uv pip install /tmp/*.whl "litestar[standard]>=2.15.0" "granian>=2.0.0" "msgspec>=0.19.0" "prometheus-client>=0.21.0" "pycryptodome>=3.23.0" && \
     rm /tmp/*.whl && \
     mkdir -p /app/.cache/uv && chown -R py3signer:py3signer /app/.cache
 
@@ -81,8 +81,8 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
 
-# Set entrypoint using uv
-ENTRYPOINT ["uv", "run", "python", "-m", "py3signer"]
+# Set entrypoint using Granian ASGI
+ENTRYPOINT ["uv", "run", "granian", "--interface", "asgi", "--host", "0.0.0.0", "--port", "8080", "py3signer.asgi:app"]
 
-# Default arguments
-CMD ["--host", "0.0.0.0", "--port", "8080"]
+# Default arguments (can be overridden)
+CMD []

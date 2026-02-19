@@ -1,66 +1,81 @@
-"""aiohttp server setup."""
+"""Litestar server setup with Granian ASGI server."""
 
-import asyncio
 import logging
 import ssl
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
-from aiohttp import web
+from litestar import Litestar
 
 from .bulk_loader import load_input_only_keystores, load_keystores_from_directory
 from .config import Config
-from .handlers import APIHandler, setup_routes
-from .metrics import MetricsServer, setup_metrics_middleware
+from .handlers import get_routers
 from .signer import Signer
 from .storage import KeyStorage
 
 logger = logging.getLogger(__name__)
 
-# Typed app keys to avoid NotAppKeyWarning
-APP_KEY_STORAGE: web.AppKey[KeyStorage] = web.AppKey("storage", KeyStorage)
-APP_KEY_SIGNER: web.AppKey[Signer] = web.AppKey("signer", Signer)
 
+def create_app(
+    config: Config | None = None,
+    storage: KeyStorage | None = None,
+    signer: Signer | None = None,
+) -> Litestar:
+    """Create and configure the Litestar application."""
 
-def create_app(config: Config) -> web.Application:
-    """Create and configure the aiohttp application."""
-    # Create components
-    storage = KeyStorage(keystore_path=config.key_store_path)
-    signer = Signer(storage)
-    handler = APIHandler(storage, signer, auth_token=config.auth_token)
+    # If config is provided but storage/signer are not, create them
+    if config is not None and (storage is None or signer is None):
+        storage = KeyStorage(keystore_path=config.key_store_path)
+        signer = Signer(storage)
 
-    # Load keystores from key_store_path if configured (persistent keystores)
-    if config.key_store_path:
-        success, failures = load_keystores_from_directory(config.key_store_path, storage)
-        logger.info(f"Loaded {success} keystores from {config.key_store_path}")
-        if failures > 0:
-            logger.warning(f"Failed to load {failures} keystores")
+        # Load keystores from key_store_path if configured (persistent keystores)
+        if config.key_store_path:
+            success, failures = load_keystores_from_directory(config.key_store_path, storage)
+            logger.info(f"Loaded {success} keystores from {config.key_store_path}")
+            if failures > 0:
+                logger.warning(f"Failed to load {failures} keystores")
 
-    # Load input-only keystores from separate directories if configured
-    if config.keystores_path and config.keystores_passwords_path:
-        success, failures = load_input_only_keystores(
-            config.keystores_path, config.keystores_passwords_path, storage
-        )
-        logger.info(f"Loaded {success} input-only keystores from {config.keystores_path}")
-        if failures > 0:
-            logger.warning(f"Failed to load {failures} input-only keystores")
+        # Load input-only keystores from separate directories if configured
+        if config.keystores_path and config.keystores_passwords_path:
+            success, failures = load_input_only_keystores(
+                config.keystores_path, config.keystores_passwords_path, storage
+            )
+            logger.info(f"Loaded {success} input-only keystores from {config.keystores_path}")
+            if failures > 0:
+                logger.warning(f"Failed to load {failures} input-only keystores")
 
-    # Create app
-    app = web.Application()
+    # Fallback for when storage/signer are passed directly (e.g., tests)
+    if storage is None:
+        storage = KeyStorage()
+    if signer is None:
+        signer = Signer(storage)
 
-    # Store components in app for access using typed AppKey
-    app[APP_KEY_STORAGE] = storage
-    app[APP_KEY_SIGNER] = signer
+    auth_token = config.auth_token if config else None
 
-    # Setup routes
-    setup_routes(app, handler)
+    @asynccontextmanager
+    async def lifespan(app: Litestar) -> AsyncGenerator[None, None]:
+        """Lifespan context manager for startup/shutdown."""
+        logger.info("Starting py3signer server")
+        yield
+        logger.info("Stopping py3signer server")
 
-    # Setup metrics middleware (after routes are registered)
-    setup_metrics_middleware(app)
+    # Create the Litestar app
+    app = Litestar(
+        route_handlers=get_routers(),
+        lifespan=[lifespan],
+        debug=False,
+        state={
+            "storage": storage,
+            "signer": signer,
+            "auth_token": auth_token,
+        },
+    )
 
     return app
 
 
 async def run_server(config: Config) -> None:
-    """Run the aiohttp server."""
+    """Run the Litestar server with Granian."""
     logger.info(f"Starting py3signer on {config.host}:{config.port}")
 
     # Create app
@@ -73,29 +88,25 @@ async def run_server(config: Config) -> None:
         ssl_context.load_cert_chain(str(config.tls_cert), str(config.tls_key))
         logger.info("TLS enabled")
 
-    # Run server
-    runner = web.AppRunner(app)
-    await runner.setup()
+    # Import Granian
+    from granian import Granian
+    from granian.constants import Interfaces
 
-    site = web.TCPSite(runner, host=config.host, port=config.port, ssl_context=ssl_context)
-
-    await site.start()
+    # Run with Granian ASGI
+    server = Granian(
+        target=app,
+        address=config.host,
+        port=config.port,
+        interface=Interfaces.ASGI,
+        ssl_context=ssl_context,
+        workers=1,  # Default to single worker for now
+    )
 
     protocol = "https" if ssl_context else "http"
     logger.info(f"Server running at {protocol}://{config.host}:{config.port}")
-
-    # Start metrics server if enabled
-    metrics_server = MetricsServer(host=config.metrics_host, port=config.metrics_port)
-    await metrics_server.start()
-
     logger.info("Press Ctrl+C to stop")
 
-    # Keep running
     try:
-        while True:
-            await asyncio.sleep(3600)
-    except asyncio.CancelledError:
-        pass
-    finally:
-        await metrics_server.stop()
-        await runner.cleanup()
+        server.serve()
+    except KeyboardInterrupt:
+        logger.info("Shutting down...")

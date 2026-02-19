@@ -37,7 +37,3 @@ def main() -> None:
     except Exception:
         logging.getLogger(__name__).exception("Server error")
         sys.exit(1)
-
-
-if __name__ == "__main__":
-    main()

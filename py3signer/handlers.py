@@ -1,10 +1,17 @@
-"""HTTP route handlers for Keymanager API with msgspec validation."""
+"""HTTP route handlers for Keymanager API with Litestar."""
 
-import json
 import logging
+from typing import Any
 
 import msgspec
-from aiohttp import web
+from litestar import Controller, Request, Response, Router, delete, get, post
+from litestar.exceptions import HTTPException, NotFoundException, ValidationException
+from litestar.status_codes import (
+    HTTP_200_OK,
+    HTTP_401_UNAUTHORIZED,
+    HTTP_500_INTERNAL_SERVER_ERROR,
+    HTTP_501_NOT_IMPLEMENTED,
+)
 
 from .keystore import Keystore, KeystoreError
 from .signer import Signer, SignerError
@@ -17,6 +24,9 @@ from .signing_types import (
 from .storage import KeyStorage
 
 logger = logging.getLogger(__name__)
+
+
+# Request/Response structs
 
 
 class KeystoreImportRequest(msgspec.Struct):
@@ -42,83 +52,145 @@ class KeystoreDeleteRequest(msgspec.Struct):
             raise ValueError("pubkeys must not be empty")
 
 
-keystore_import_decoder = msgspec.json.Decoder(KeystoreImportRequest)
-keystore_delete_decoder = msgspec.json.Decoder(KeystoreDeleteRequest)
+class KeystoreImportResult(msgspec.Struct):
+    """Result of importing a keystore."""
+
+    status: str
+    message: str
 
 
-def _bad_request(message: str) -> web.HTTPBadRequest:
-    """Create a bad request response."""
-    return web.HTTPBadRequest(text=json.dumps({"error": message}), content_type="application/json")
+class KeystoreDeleteResult(msgspec.Struct):
+    """Result of deleting a keystore."""
+
+    status: str
+    message: str
 
 
-def _validation_error(e: Exception) -> web.HTTPBadRequest:
-    """Create a validation error response."""
-    return _bad_request(f"Validation error: {e}")
+class KeystoreInfo(msgspec.Struct):
+    """Keystore information response."""
+
+    validating_pubkey: str
+    derivation_path: str
+    readonly: bool = False
 
 
-class APIHandler:
-    """HTTP request handlers for the Keymanager API."""
+class HealthResponse(msgspec.Struct):
+    """Health check response."""
 
-    def __init__(self, storage: KeyStorage, signer: Signer, auth_token: str | None = None):
-        self._storage = storage
-        self._signer = signer
-        self._auth_token = auth_token
-        self._persistence_enabled = storage.keystore_path is not None
-        if self._persistence_enabled:
-            logger.info(f"Keystore persistence enabled: {storage.keystore_path}")
+    status: str
+    keys_loaded: int
 
-    async def _check_auth(self, request: web.Request) -> bool:
-        """Check if request is authenticated."""
-        if self._auth_token is None:
-            return True
-        auth_header = request.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer "):
-            return False
-        return auth_header[7:] == self._auth_token
 
-    async def _require_auth(self, request: web.Request) -> None:
-        """Raise 401 if not authenticated."""
-        if not await self._check_auth(request):
-            raise web.HTTPUnauthorized(
-                text=json.dumps({"error": "Unauthorized"}), content_type="application/json"
-            )
+class Web3SignerHealthResponse(msgspec.Struct):
+    """Web3Signer-compatible healthcheck response."""
 
-    async def health(self, request: web.Request) -> web.Response:
+    status: str
+    outcome: str
+
+
+# Helper functions to get state from request
+
+
+def _get_storage(request: Request) -> KeyStorage:
+    """Get KeyStorage from app state."""
+    result: KeyStorage = request.app.state["storage"]
+    return result
+
+
+def _get_signer(request: Request) -> Signer:
+    """Get Signer from app state."""
+    result: Signer = request.app.state["signer"]
+    return result
+
+
+def _get_auth_token(request: Request) -> str | None:
+    """Get auth token from app state."""
+    result: str | None = request.app.state["auth_token"]
+    return result
+
+
+def _check_auth(request: Request) -> None:
+    """Check if request is authenticated."""
+    auth_token = _get_auth_token(request)
+    if auth_token is None:
+        return
+
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized",
+        )
+    if auth_header[7:] != auth_token:
+        raise HTTPException(
+            status_code=HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized",
+        )
+
+
+# Controllers
+
+
+class HealthController(Controller):  # type: ignore[misc]
+    """Health check endpoints."""
+
+    path = "/"
+
+    @get("/health")  # type: ignore[untyped-decorator]
+    async def health(self, request: Request) -> HealthResponse:
         """Health check endpoint."""
-        return web.json_response({"status": "healthy", "keys_loaded": len(self._storage)})
+        storage = _get_storage(request)
+        return HealthResponse(status="healthy", keys_loaded=len(storage))
 
-    async def healthcheck(self, request: web.Request) -> web.Response:
+    @get("/healthcheck")  # type: ignore[untyped-decorator]
+    async def healthcheck(self) -> Web3SignerHealthResponse:
         """Health check endpoint for compatibility with Vero validator client.
 
         Returns Web3Signer-compatible healthcheck response.
         """
-        return web.json_response({"status": "UP", "outcome": "UP"})
+        return Web3SignerHealthResponse(status="UP", outcome="UP")
 
-    async def list_keystores(self, request: web.Request) -> web.Response:
+
+class KeystoreController(Controller):  # type: ignore[misc]
+    """Keymanager API keystore endpoints."""
+
+    path = "/eth/v1/keystores"
+
+    @get()  # type: ignore[untyped-decorator]
+    async def list_keystores(self, request: Request) -> Response[dict[str, Any]]:
         """GET /eth/v1/keystores - List all imported keys."""
-        await self._require_auth(request)
+        _check_auth(request)
+        storage = _get_storage(request)
 
-        keys = self._storage.list_keys()
+        keys = storage.list_keys()
         keystores = [
-            {"validating_pubkey": pubkey, "derivation_path": path, "readonly": False}
+            KeystoreInfo(validating_pubkey=pubkey, derivation_path=path, readonly=False)
             for pubkey, path, _ in keys
         ]
-        return web.json_response({"data": keystores})
+        return Response(
+            content={"data": [msgspec.to_builtins(k) for k in keystores]},
+            status_code=HTTP_200_OK,
+        )
 
-    async def import_keystores(self, request: web.Request) -> web.Response:
+    @post()  # type: ignore[untyped-decorator]
+    async def import_keystores(
+        self, request: Request, data: dict[str, Any]
+    ) -> Response[dict[str, Any]]:
         """POST /eth/v1/keystores - Import keystores."""
-        await self._require_auth(request)
+        _check_auth(request)
+        storage = _get_storage(request)
 
+        # Validate request manually since msgspec doesn't integrate directly
         try:
-            body_bytes = await request.read()
-            import_req = keystore_import_decoder.decode(body_bytes)
+            import_req = msgspec.convert(data, KeystoreImportRequest)
         except (msgspec.ValidationError, msgspec.DecodeError) as e:
-            raise _validation_error(e)
+            raise ValidationException(detail=f"Validation error: {e}") from e
         except ValueError as e:
-            raise _bad_request(str(e))
+            raise ValidationException(detail=str(e)) from e
 
         results = []
-        existing_keys = {k[0] for k in self._storage.list_keys()}
+        existing_keys = {k[0] for k in storage.list_keys()}
+        persistence_enabled = storage.keystore_path is not None
 
         for keystore_json, password in zip(import_req.keystores, import_req.passwords):
             try:
@@ -129,166 +201,201 @@ class APIHandler:
 
                 if pubkey_hex in existing_keys:
                     results.append(
-                        {
-                            "status": "duplicate",
-                            "message": f"Keystore already exists for pubkey {keystore.pubkey}",
-                        }
+                        KeystoreImportResult(
+                            status="duplicate",
+                            message=f"Keystore already exists for pubkey {keystore.pubkey}",
+                        )
                     )
                     continue
 
                 # Add key with optional persistence
-                _, persisted = self._storage.add_key(
+                _, persisted = storage.add_key(
                     pubkey=pubkey,
                     secret_key=secret_key,
                     path=keystore.path,
                     description=keystore.description,
-                    keystore_json=keystore_json if self._persistence_enabled else None,
-                    password=password if self._persistence_enabled else None,
+                    keystore_json=keystore_json if persistence_enabled else None,
+                    password=password if persistence_enabled else None,
                 )
 
-                if self._persistence_enabled and not persisted:
+                if persistence_enabled and not persisted:
                     logger.warning(f"Failed to persist keystore to disk: {pubkey_hex[:20]}...")
 
                 existing_keys.add(pubkey_hex)
                 results.append(
-                    {
-                        "status": "imported",
-                        "message": f"Successfully imported keystore with pubkey {keystore.pubkey}",
-                    }
+                    KeystoreImportResult(
+                        status="imported",
+                        message=f"Successfully imported keystore with pubkey {keystore.pubkey}",
+                    )
                 )
 
             except KeystoreError as e:
-                results.append({"status": "error", "message": str(e)})
+                results.append(KeystoreImportResult(status="error", message=str(e)))
             except Exception as e:
                 logger.exception("Unexpected error importing keystore")
-                results.append({"status": "error", "message": f"Internal error: {e}"})
+                results.append(KeystoreImportResult(status="error", message=f"Internal error: {e}"))
 
-        return web.json_response({"data": results})
+        return Response(
+            content={"data": [msgspec.to_builtins(r) for r in results]},
+            status_code=HTTP_200_OK,
+        )
 
-    async def delete_keystores(self, request: web.Request) -> web.Response:
+    @delete(status_code=HTTP_200_OK)  # type: ignore[untyped-decorator]
+    async def delete_keystores(
+        self, request: Request, data: dict[str, Any]
+    ) -> Response[dict[str, Any]]:
         """DELETE /eth/v1/keystores - Delete keystores."""
-        await self._require_auth(request)
+        _check_auth(request)
+        storage = _get_storage(request)
 
         try:
-            body_bytes = await request.read()
-            delete_req = keystore_delete_decoder.decode(body_bytes)
+            delete_req = msgspec.convert(data, KeystoreDeleteRequest)
         except (msgspec.ValidationError, msgspec.DecodeError) as e:
-            raise _validation_error(e)
+            raise ValidationException(detail=f"Validation error: {e}") from e
         except ValueError as e:
-            raise _bad_request(str(e))
+            raise ValidationException(detail=str(e)) from e
 
         results = []
 
         for pubkey_hex in delete_req.pubkeys:
-            pubkey_hex = pubkey_hex.lower().replace("0x", "")
-            removed, deleted = self._storage.remove_key(pubkey_hex)
+            pubkey_hex_clean = pubkey_hex.lower().replace("0x", "")
+            removed, deleted = storage.remove_key(pubkey_hex_clean)
 
-            if removed and self._persistence_enabled and not deleted:
-                logger.warning(f"Failed to delete keystore files from disk: {pubkey_hex[:20]}...")
+            if removed and storage.keystore_path is not None and not deleted:
+                logger.warning(
+                    f"Failed to delete keystore files from disk: {pubkey_hex_clean[:20]}..."
+                )
 
             if removed:
                 results.append(
-                    {
-                        "status": "deleted",
-                        "message": f"Successfully deleted keystore with pubkey {pubkey_hex}",
-                    }
+                    KeystoreDeleteResult(
+                        status="deleted",
+                        message=f"Successfully deleted keystore with pubkey {pubkey_hex}",
+                    )
                 )
             else:
                 results.append(
-                    {
-                        "status": "not_found",
-                        "message": f"Keystore not found for pubkey {pubkey_hex}",
-                    }
+                    KeystoreDeleteResult(
+                        status="not_found",
+                        message=f"Keystore not found for pubkey {pubkey_hex}",
+                    )
                 )
 
-        return web.json_response({"data": results})
+        return Response(
+            content={"data": [msgspec.to_builtins(r) for r in results]},
+            status_code=HTTP_200_OK,
+        )
 
-    async def list_remote_keys(self, request: web.Request) -> web.Response:
+
+class RemoteKeysController(Controller):  # type: ignore[misc]
+    """Remote keys endpoints (stub)."""
+
+    path = "/eth/v1/remotekeys"
+
+    @get()  # type: ignore[untyped-decorator]
+    async def list_remote_keys(self, request: Request) -> Response[dict[str, Any]]:
         """GET /eth/v1/remotekeys - List remote keys (stub)."""
-        await self._require_auth(request)
-        return web.json_response({"data": []})
+        _check_auth(request)
+        return Response(content={"data": []}, status_code=HTTP_200_OK)
 
-    async def add_remote_keys(self, request: web.Request) -> web.Response:
+    @post()  # type: ignore[untyped-decorator]
+    async def add_remote_keys(self, request: Request) -> Response[dict[str, Any]]:
         """POST /eth/v1/remotekeys - Add remote keys (stub)."""
-        await self._require_auth(request)
-        return web.json_response({"data": [], "message": "Remote keys not supported"}, status=501)
+        _check_auth(request)
+        return Response(
+            content={"data": [], "message": "Remote keys not supported"},
+            status_code=HTTP_501_NOT_IMPLEMENTED,
+        )
 
-    async def delete_remote_keys(self, request: web.Request) -> web.Response:
+    @delete(status_code=HTTP_501_NOT_IMPLEMENTED)  # type: ignore[untyped-decorator]
+    async def delete_remote_keys(self, request: Request) -> Response[dict[str, Any]]:
         """DELETE /eth/v1/remotekeys - Delete remote keys (stub)."""
-        await self._require_auth(request)
-        return web.json_response({"data": [], "message": "Remote keys not supported"}, status=501)
+        _check_auth(request)
+        return Response(
+            content={"data": [], "message": "Remote keys not supported"},
+            status_code=HTTP_501_NOT_IMPLEMENTED,
+        )
 
-    async def list_public_keys(self, request: web.Request) -> web.Response:
+
+class SigningController(Controller):  # type: ignore[misc]
+    """Remote Signing API endpoints."""
+
+    path = "/api/v1/eth2"
+
+    @get("/publicKeys")  # type: ignore[untyped-decorator]
+    async def list_public_keys(self, request: Request) -> Response[list[str]]:
         """GET /api/v1/eth2/publicKeys - List available BLS public keys."""
-        await self._require_auth(request)
-        keys = self._storage.list_keys()
+        _check_auth(request)
+        storage = _get_storage(request)
+        keys = storage.list_keys()
         public_keys = [f"0x{pubkey}" for pubkey, _, _ in keys]
-        return web.json_response(public_keys)
+        return Response(content=public_keys, status_code=HTTP_200_OK)
 
-    async def sign(self, request: web.Request) -> web.Response:
+    @post("/sign/{identifier:str}")  # type: ignore[untyped-decorator]
+    async def sign(self, request: Request, identifier: str) -> Response:
         """POST /api/v1/eth2/sign/:identifier - Sign data."""
-        await self._require_auth(request)
+        _check_auth(request)
+        signer = _get_signer(request)
 
-        pubkey_hex = request.match_info.get("identifier", "").lower().replace("0x", "")
+        pubkey_hex = identifier.lower().replace("0x", "")
         if not pubkey_hex:
-            raise _bad_request("Missing identifier")
+            raise ValidationException(detail="Missing identifier")
 
+        # Read and parse request body
         try:
-            body_bytes = await request.read()
+            body_bytes = await request.body()
             sign_req: SignRequest = sign_request_decoder.decode(body_bytes)
         except (msgspec.ValidationError, msgspec.DecodeError) as e:
-            raise _validation_error(e)
+            raise ValidationException(detail=f"Validation error: {e}") from e
         except ValueError as e:
-            raise _bad_request(str(e))
+            raise ValidationException(detail=str(e)) from e
 
         try:
             message = validate_signing_root(sign_req.signing_root)
         except ValueError as e:
-            raise _bad_request(str(e))
+            raise ValidationException(detail=str(e)) from e
 
         if message is None:
-            # Per the Ethereum Remote Signing API spec, signing_root is technically optional
-            # and the server should compute the signing root from the data if not provided.
-            # However, SSZ signing root computation is not yet implemented.
-            # The validator client should provide signing_root for now.
-            raise _bad_request(
-                "signing_root is required - SSZ signing root computation from request data "
+            raise ValidationException(
+                detail="signing_root is required - SSZ signing root computation from request data "
                 "is not yet implemented. Please provide signing_root in the request."
             )
 
         try:
             domain = get_domain_for_request(sign_req)
         except ValueError as e:
-            raise web.HTTPInternalServerError(
-                text=json.dumps({"error": str(e)}), content_type="application/json"
-            )
+            raise HTTPException(
+                status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=str(e),
+            ) from e
 
         try:
-            signature = self._signer.sign_data(pubkey_hex=pubkey_hex, data=message, domain=domain)
+            signature = signer.sign_data(pubkey_hex=pubkey_hex, data=message, domain=domain)
             signature_hex = signature.to_bytes().hex()
             # Return just the raw hex string (not JSON) per Web3Signer API spec
-            # The response body should be the signature as a hex string without quotes
-            return web.Response(text=f"0x{signature_hex}", content_type="text/plain")
-        except SignerError as e:
-            raise web.HTTPNotFound(
-                text=json.dumps({"error": str(e)}), content_type="application/json"
+            return Response(
+                content=f"0x{signature_hex}",
+                status_code=HTTP_200_OK,
+                media_type="text/plain",
             )
+        except SignerError as e:
+            raise NotFoundException(detail=str(e)) from e
         except Exception as e:
             logger.exception("Signing error")
-            raise web.HTTPInternalServerError(
-                text=json.dumps({"error": f"Signing failed: {e}"}), content_type="application/json"
-            )
+            raise HTTPException(
+                status_code=HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Signing failed: {e}",
+            ) from e
 
 
-def setup_routes(app: web.Application, handler: APIHandler) -> None:
-    """Set up all routes for the application."""
-    app.router.add_get("/health", handler.health)
-    app.router.add_get("/healthcheck", handler.healthcheck)
-    app.router.add_get("/eth/v1/keystores", handler.list_keystores)
-    app.router.add_post("/eth/v1/keystores", handler.import_keystores)
-    app.router.add_delete("/eth/v1/keystores", handler.delete_keystores)
-    app.router.add_get("/eth/v1/remotekeys", handler.list_remote_keys)
-    app.router.add_post("/eth/v1/remotekeys", handler.add_remote_keys)
-    app.router.add_delete("/eth/v1/remotekeys", handler.delete_remote_keys)
-    app.router.add_get("/api/v1/eth2/publicKeys", handler.list_public_keys)
-    app.router.add_post("/api/v1/eth2/sign/{identifier}", handler.sign)
+# Router configuration
+
+
+def get_routers() -> list[Router]:
+    """Get all routers for the application."""
+    return [
+        Router(path="/", route_handlers=[HealthController]),
+        Router(path="/", route_handlers=[KeystoreController]),
+        Router(path="/", route_handlers=[RemoteKeysController]),
+        Router(path="/", route_handlers=[SigningController]),
+    ]
