@@ -62,7 +62,13 @@ class TestKeystore:
             "crypto": {
                 "kdf": {
                     "function": "scrypt",
-                    "params": {"dklen": 32, "n": 262144, "p": 1, "r": 8, "salt": "aa" * 32},
+                    "params": {
+                        "dklen": 32,
+                        "n": 262144,
+                        "p": 1,
+                        "r": 8,
+                        "salt": "aa" * 32,
+                    },
                     "message": "",
                 },
                 "checksum": {"function": "sha256", "params": {}, "message": "aa" * 32},

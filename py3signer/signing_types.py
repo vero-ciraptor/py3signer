@@ -166,7 +166,11 @@ class AggregationSlotSignRequest(
 
 
 class AggregateAndProofSignRequest(
-    msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag="AGGREGATE_AND_PROOF"
+    msgspec.Struct,
+    kw_only=True,
+    frozen=True,
+    tag_field="type",
+    tag="AGGREGATE_AND_PROOF",
 ):
     """Request to sign an aggregate and proof (deprecated)."""
 
@@ -176,7 +180,11 @@ class AggregateAndProofSignRequest(
 
 
 class AggregateAndProofV2SignRequest(
-    msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag="AGGREGATE_AND_PROOF_V2"
+    msgspec.Struct,
+    kw_only=True,
+    frozen=True,
+    tag_field="type",
+    tag="AGGREGATE_AND_PROOF_V2",
 ):
     """Request to sign a versioned aggregate and proof."""
 
@@ -195,7 +203,9 @@ class AttestationSignRequest(
     signing_root: str | None = msgspec.field(name="signing_root", default=None)
 
 
-class BlockSignRequest(msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag="BLOCK"):
+class BlockSignRequest(
+    msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag="BLOCK"
+):
     """Request to sign a beacon block (deprecated)."""
 
     block: dict[str, Any]  # BeaconBlock
@@ -244,7 +254,11 @@ class VoluntaryExitSignRequest(
 
 
 class SyncCommitteeMessageSignRequest(
-    msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag="SYNC_COMMITTEE_MESSAGE"
+    msgspec.Struct,
+    kw_only=True,
+    frozen=True,
+    tag_field="type",
+    tag="SYNC_COMMITTEE_MESSAGE",
 ):
     """Request to sign a sync committee message."""
 
@@ -282,7 +296,11 @@ class SyncCommitteeContributionAndProofSignRequest(
 
 
 class ValidatorRegistrationSignRequest(
-    msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag="VALIDATOR_REGISTRATION"
+    msgspec.Struct,
+    kw_only=True,
+    frozen=True,
+    tag_field="type",
+    tag="VALIDATOR_REGISTRATION",
 ):
     """Request to sign a validator registration."""
 

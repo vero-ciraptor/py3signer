@@ -72,14 +72,18 @@ class TestForkInfo:
 
     def test_fork_creation(self) -> None:
         """Test creating a Fork struct."""
-        fork = Fork(previous_version="0x00000000", current_version="0x01000000", epoch="100")
+        fork = Fork(
+            previous_version="0x00000000", current_version="0x01000000", epoch="100"
+        )
         assert fork.previous_version == "0x00000000"
         assert fork.current_version == "0x01000000"
         assert fork.epoch == "100"
 
     def test_fork_info_creation(self) -> None:
         """Test creating a ForkInfo struct."""
-        fork = Fork(previous_version="0x00000000", current_version="0x00000000", epoch="0")
+        fork = Fork(
+            previous_version="0x00000000", current_version="0x00000000", epoch="0"
+        )
         fork_info = ForkInfo(fork=fork, genesis_validators_root="0x" + "00" * 32)
         assert fork_info.fork == fork
         assert fork_info.genesis_validators_root == "0x" + "00" * 32
@@ -344,7 +348,9 @@ class TestGetDomainForRequest:
                 genesis_validators_root="0x0",
             ),
             signing_root="0x" + "00" * 32,
-            sync_committee_message=SyncCommitteeMessageData(slot="100", beacon_block_root="0x0"),
+            sync_committee_message=SyncCommitteeMessageData(
+                slot="100", beacon_block_root="0x0"
+            ),
         )
         assert get_domain_for_request(request) == DOMAIN_SYNC_COMMITTEE
 
@@ -373,7 +379,10 @@ class TestGetDomainForRequest:
             ),
             signing_root="0x" + "00" * 32,
             validator_registration=ValidatorRegistration(
-                fee_recipient="0x0", gas_limit="30000000", timestamp="1234567890", pubkey="0x0"
+                fee_recipient="0x0",
+                gas_limit="30000000",
+                timestamp="1234567890",
+                pubkey="0x0",
             ),
         )
         assert get_domain_for_request(request) == DOMAIN_APPLICATION_MASK
@@ -425,7 +434,10 @@ class TestAllSigningTypes:
             ("VOLUNTARY_EXIT", VoluntaryExitSignRequest),
             ("SYNC_COMMITTEE_MESSAGE", SyncCommitteeMessageSignRequest),
             ("SYNC_COMMITTEE_SELECTION_PROOF", SyncCommitteeSelectionProofSignRequest),
-            ("SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF", SyncCommitteeContributionAndProofSignRequest),
+            (
+                "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF",
+                SyncCommitteeContributionAndProofSignRequest,
+            ),
             ("VALIDATOR_REGISTRATION", ValidatorRegistrationSignRequest),
         ],
     )
@@ -434,7 +446,11 @@ class TestAllSigningTypes:
         # Build minimal valid JSON for each type
         base_json: dict[str, Any] = {
             "fork_info": {
-                "fork": {"previous_version": "0x0", "current_version": "0x0", "epoch": "0"},
+                "fork": {
+                    "previous_version": "0x0",
+                    "current_version": "0x0",
+                    "epoch": "0",
+                },
                 "genesis_validators_root": "0x0",
             },
             "signing_root": "0x" + "00" * 32,
@@ -471,7 +487,9 @@ class TestAllSigningTypes:
                 }
             },
             "RANDAO_REVEAL": {"randao_reveal": {"epoch": "1"}},
-            "VOLUNTARY_EXIT": {"voluntary_exit": {"epoch": "1", "validator_index": "0"}},
+            "VOLUNTARY_EXIT": {
+                "voluntary_exit": {"epoch": "1", "validator_index": "0"}
+            },
             "SYNC_COMMITTEE_MESSAGE": {
                 "sync_committee_message": {
                     "slot": "1",
@@ -479,7 +497,10 @@ class TestAllSigningTypes:
                 }
             },
             "SYNC_COMMITTEE_SELECTION_PROOF": {
-                "sync_aggregator_selection_data": {"slot": "1", "subcommittee_index": "0"}
+                "sync_aggregator_selection_data": {
+                    "slot": "1",
+                    "subcommittee_index": "0",
+                }
             },
             "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF": {
                 "contribution_and_proof": {

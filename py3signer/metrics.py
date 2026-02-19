@@ -155,7 +155,9 @@ class MetricsServer:
         def run_server() -> None:
             """Run the HTTP server."""
             self._server = HTTPServer((self._host, self._port), MetricsHandler)
-            logger.info(f"Metrics server running at http://{self._host}:{self._port}/metrics")
+            logger.info(
+                f"Metrics server running at http://{self._host}:{self._port}/metrics"
+            )
             while self._running:
                 try:
                     self._server.handle_request()

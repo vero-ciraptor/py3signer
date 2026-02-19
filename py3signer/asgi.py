@@ -38,7 +38,9 @@ def load_config_from_env() -> Config | None:
         if config_dict.get("keystores_path"):
             config_dict["keystores_path"] = Path(config_dict["keystores_path"])
         if config_dict.get("keystores_passwords_path"):
-            config_dict["keystores_passwords_path"] = Path(config_dict["keystores_passwords_path"])
+            config_dict["keystores_passwords_path"] = Path(
+                config_dict["keystores_passwords_path"]
+            )
         return msgspec.convert(config_dict, Config)
     except Exception as e:
         logger.error(f"Failed to load config from environment: {e}")
@@ -59,7 +61,9 @@ def store_config_in_env(config: Config) -> None:
         "key_store_path": str(config.key_store_path) if config.key_store_path else None,
         "keystores_path": str(config.keystores_path) if config.keystores_path else None,
         "keystores_passwords_path": (
-            str(config.keystores_passwords_path) if config.keystores_passwords_path else None
+            str(config.keystores_passwords_path)
+            if config.keystores_passwords_path
+            else None
         ),
         "workers": config.workers,
     }
@@ -93,7 +97,9 @@ def get_app() -> Litestar:
 
 # ASGI application callable
 # Granian calls this with (scope, receive, send)
-async def app(scope: dict[str, Any], receive: Callable[..., Any], send: Callable[..., Any]) -> None:
+async def app(
+    scope: dict[str, Any], receive: Callable[..., Any], send: Callable[..., Any]
+) -> None:
     """ASGI application entry point."""
     litestar_app = get_app()
     await litestar_app(scope, receive, send)

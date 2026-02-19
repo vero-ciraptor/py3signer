@@ -108,7 +108,9 @@ def load_keystores_from_directory(
             pubkey, secret_key, path, description = load_keystore_with_password(
                 keystore_path, password_path
             )
-            storage.add_key(pubkey, secret_key, path, description, persistent=persistent)
+            storage.add_key(
+                pubkey, secret_key, path, description, persistent=persistent
+            )
             logger.info(f"Loaded keystore: {base_name} (persistent={persistent})")
             success_count += 1
         except KeystoreError as e:
@@ -121,7 +123,9 @@ def load_keystores_from_directory(
             logger.error(f"Unexpected error loading keystore {base_name}: {e}")
             failure_count += 1
 
-    logger.info(f"Bulk loading complete: {success_count} succeeded, {failure_count} failed")
+    logger.info(
+        f"Bulk loading complete: {success_count} succeeded, {failure_count} failed"
+    )
     return success_count, failure_count
 
 

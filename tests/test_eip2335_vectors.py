@@ -83,7 +83,9 @@ EIP2335_PBKDF2_KEYSTORE: dict[str, Any] = {
 EIP2335_PASSWORD = "𝔱𝔢𝔰𝔱𝔭𝔞𝔰𝔰𝔴𝔬𝔯𝔡🔑"
 
 # Expected secret
-EIP2335_SECRET = bytes.fromhex("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f")
+EIP2335_SECRET = bytes.fromhex(
+    "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
+)
 
 
 class TestEIP2335OfficialVectors:
@@ -213,7 +215,8 @@ class TestCipherSupport:
         with pytest.raises(KeystoreError) as exc_info:
             keystore.decrypt(EIP2335_PASSWORD)
         assert (
-            "unsupported" in str(exc_info.value).lower() or "cipher" in str(exc_info.value).lower()
+            "unsupported" in str(exc_info.value).lower()
+            or "cipher" in str(exc_info.value).lower()
         )
 
 
@@ -264,7 +267,8 @@ class TestChecksumVerification:
         with pytest.raises(KeystoreError) as exc_info:
             keystore.decrypt(EIP2335_PASSWORD)
         assert (
-            "password" in str(exc_info.value).lower() or "checksum" in str(exc_info.value).lower()
+            "password" in str(exc_info.value).lower()
+            or "checksum" in str(exc_info.value).lower()
         )
 
 

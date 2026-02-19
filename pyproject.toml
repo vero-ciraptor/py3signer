@@ -8,20 +8,6 @@ version = "0.1.0"
 description = "A Remote BLS Signer for Ethereum Consensus Layer"
 readme = "README.md"
 requires-python = ">=3.12"
-license = {text = "MIT"}
-authors = [
-    {name = "py3signer contributors"}
-]
-classifiers = [
-    "Development Status :: 3 - Alpha",
-    "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
-    "Programming Language :: Rust",
-    "Topic :: Security :: Cryptography",
-]
 dependencies = [
     "litestar[standard]>=2.15.0",
     "granian>=2.0.0",
@@ -46,19 +32,11 @@ dev = [
     "httpx>=0.27.0",
 ]
 
-[tool.pytest.ini_options]
+[tool.pytest]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 pythonpath = ["."]
-addopts = "-v --tb=short"
-
-[tool.coverage.run]
-source = ["py3signer"]
-omit = ["tests/*"]
-
-[tool.ruff]
-target-version = "py312"
-line-length = 100
+addopts = ["-v", "--tb=short"]
 
 [tool.ruff.lint]
 select = [
@@ -70,10 +48,6 @@ select = [
     "UP",
 ]
 ignore = ["E501"]
-
-[tool.ruff.format]
-quote-style = "double"
-indent-style = "space"
 
 [tool.mypy]
 python_version = "3.12"

@@ -15,7 +15,11 @@ from py3signer.server import create_app
 def valid_fork_info() -> dict[str, Any]:
     """Return a valid fork info structure."""
     return {
-        "fork": {"previous_version": "0x00000000", "current_version": "0x00000000", "epoch": "0"},
+        "fork": {
+            "previous_version": "0x00000000",
+            "current_version": "0x00000000",
+            "epoch": "0",
+        },
         "genesis_validators_root": "0x0000000000000000000000000000000000000000000000000000000000000000",
     }
 
@@ -40,7 +44,9 @@ async def test_health_endpoint(client: AsyncTestClient) -> None:
     ],
 )
 @pytest.mark.asyncio
-async def test_list_empty(client: AsyncTestClient, endpoint: str, extract_key: str | None) -> None:
+async def test_list_empty(
+    client: AsyncTestClient, endpoint: str, extract_key: str | None
+) -> None:
     """Test listing endpoints when none are loaded."""
     resp = await client.get(endpoint)
     assert resp.status_code == 200
@@ -55,7 +61,9 @@ async def test_list_empty(client: AsyncTestClient, endpoint: str, extract_key: s
 async def test_import_keystore_invalid_json(client: AsyncTestClient) -> None:
     """Test importing with invalid JSON."""
     resp = await client.post(
-        "/eth/v1/keystores", content="not json", headers={"Content-Type": "application/json"}
+        "/eth/v1/keystores",
+        content="not json",
+        headers={"Content-Type": "application/json"},
     )
     assert resp.status_code == 400
 
@@ -63,13 +71,20 @@ async def test_import_keystore_invalid_json(client: AsyncTestClient) -> None:
 @pytest.mark.parametrize(
     "keystores,passwords,expected_error",
     [
-        (["keystore1"], ["pass1", "pass2"], "keystores and passwords must have the same length"),
+        (
+            ["keystore1"],
+            ["pass1", "pass2"],
+            "keystores and passwords must have the same length",
+        ),
         ([], [], "keystores must not be empty"),
     ],
 )
 @pytest.mark.asyncio
 async def test_import_keystore_validation_errors(
-    client: AsyncTestClient, keystores: list[str], passwords: list[str], expected_error: str
+    client: AsyncTestClient,
+    keystores: list[str],
+    passwords: list[str],
+    expected_error: str,
 ) -> None:
     """Test importing with various validation errors."""
     resp = await client.post(
@@ -83,7 +98,9 @@ async def test_import_keystore_validation_errors(
 
 @pytest.mark.asyncio
 async def test_import_keystore_success(
-    client: AsyncTestClient, sample_keystore: dict[str, Any], sample_keystore_password: str
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
 ) -> None:
     """Test successful keystore import."""
     keystore_json = json.dumps(sample_keystore)
@@ -107,7 +124,8 @@ async def test_import_keystore_wrong_password(
     keystore_json = json.dumps(sample_keystore)
 
     resp = await client.post(
-        "/eth/v1/keystores", json={"keystores": [keystore_json], "passwords": ["wrongpassword"]}
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": ["wrongpassword"]},
     )
     assert resp.status_code == 200
 
@@ -117,7 +135,9 @@ async def test_import_keystore_wrong_password(
 
 @pytest.mark.asyncio
 async def test_list_keystores_after_import(
-    client: AsyncTestClient, sample_keystore: dict[str, Any], sample_keystore_password: str
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
 ) -> None:
     """Test listing keystores after importing."""
     # First import a keystore
@@ -139,7 +159,9 @@ async def test_list_keystores_after_import(
 
 @pytest.mark.asyncio
 async def test_delete_keystore(
-    client: AsyncTestClient, sample_keystore: dict[str, Any], sample_keystore_password: str
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
 ) -> None:
     """Test deleting a keystore."""
     # First import
@@ -151,7 +173,9 @@ async def test_delete_keystore(
 
     # Then delete
     resp = await client.request(
-        "DELETE", "/eth/v1/keystores", content=json.dumps({"pubkeys": [sample_keystore["pubkey"]]})
+        "DELETE",
+        "/eth/v1/keystores",
+        content=json.dumps({"pubkeys": [sample_keystore["pubkey"]]}),
     )
     assert resp.status_code == 200
 
@@ -179,7 +203,9 @@ async def test_delete_nonexistent_keystore(client: AsyncTestClient) -> None:
 @pytest.mark.asyncio
 async def test_delete_empty_pubkeys(client: AsyncTestClient) -> None:
     """Test deleting with empty pubkeys array."""
-    resp = await client.request("DELETE", "/eth/v1/keystores", content=json.dumps({"pubkeys": []}))
+    resp = await client.request(
+        "DELETE", "/eth/v1/keystores", content=json.dumps({"pubkeys": []})
+    )
     assert resp.status_code == 400
 
 
@@ -201,7 +227,9 @@ async def test_remote_keys_stub(client: AsyncTestClient) -> None:
 
 @pytest.mark.asyncio
 async def test_list_public_keys_after_import(
-    client: AsyncTestClient, sample_keystore: dict[str, Any], sample_keystore_password: str
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
 ) -> None:
     """Test listing public keys after importing keystores."""
     # First import a keystore
@@ -246,11 +274,15 @@ async def test_auth_token_required(endpoint: str) -> None:
         assert resp.status_code == 401
 
         # Request with wrong auth should fail
-        resp = await client.get(endpoint, headers={"Authorization": "Bearer wrong_token"})
+        resp = await client.get(
+            endpoint, headers={"Authorization": "Bearer wrong_token"}
+        )
         assert resp.status_code == 401
 
         # Request with correct auth should succeed
-        resp = await client.get(endpoint, headers={"Authorization": "Bearer secret_token"})
+        resp = await client.get(
+            endpoint, headers={"Authorization": "Bearer secret_token"}
+        )
         assert resp.status_code == 200
 
 
@@ -318,7 +350,9 @@ async def test_delete_keystore_with_persistence(
 
 @pytest.mark.asyncio
 async def test_import_duplicate_keystore(
-    client: AsyncTestClient, sample_keystore: dict[str, Any], sample_keystore_password: str
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
 ) -> None:
     """Test that importing a duplicate keystore returns proper error."""
     keystore_json = json.dumps(sample_keystore)
@@ -357,7 +391,11 @@ async def test_import_duplicate_keystore(
                 "type": "ATTESTATION",
                 "signing_root": "0xabcd",
                 "fork_info": {
-                    "fork": {"previous_version": "0x00", "current_version": "0x00", "epoch": "0"},
+                    "fork": {
+                        "previous_version": "0x00",
+                        "current_version": "0x00",
+                        "epoch": "0",
+                    },
                     "genesis_validators_root": "0x00" * 32,
                 },
             },
@@ -386,7 +424,9 @@ async def test_sign_validation_errors(
 
 
 @pytest.mark.asyncio
-async def test_sign_key_not_found(client: AsyncTestClient, valid_fork_info: dict[str, Any]) -> None:
+async def test_sign_key_not_found(
+    client: AsyncTestClient, valid_fork_info: dict[str, Any]
+) -> None:
     """Test signing with non-existent key."""
     pubkey = "a" * 96
     resp = await client.post(

@@ -4,7 +4,14 @@ import pytest
 
 from py3signer.signer import Signer, SignerError
 from py3signer.storage import KeyStorage
-from py3signer_core import PublicKey, SecretKey, Signature, generate_random_key, sign, verify
+from py3signer_core import (
+    PublicKey,
+    SecretKey,
+    Signature,
+    generate_random_key,
+    sign,
+    verify,
+)
 
 
 class TestCryptoCore:

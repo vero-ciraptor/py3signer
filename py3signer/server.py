@@ -30,7 +30,9 @@ def create_app(
 
         # Load keystores from key_store_path if configured (persistent keystores)
         if config.key_store_path:
-            success, failures = load_keystores_from_directory(config.key_store_path, storage)
+            success, failures = load_keystores_from_directory(
+                config.key_store_path, storage
+            )
             logger.info(f"Loaded {success} keystores from {config.key_store_path}")
             if failures > 0:
                 logger.warning(f"Failed to load {failures} keystores")
@@ -40,7 +42,9 @@ def create_app(
             success, failures = load_input_only_keystores(
                 config.keystores_path, config.keystores_passwords_path, storage
             )
-            logger.info(f"Loaded {success} input-only keystores from {config.keystores_path}")
+            logger.info(
+                f"Loaded {success} input-only keystores from {config.keystores_path}"
+            )
             if failures > 0:
                 logger.warning(f"Failed to load {failures} input-only keystores")
 

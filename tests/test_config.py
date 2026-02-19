@@ -23,7 +23,9 @@ class TestKeystoresPathConfig:
         keystores_dir.mkdir()
         passwords_dir.mkdir()
 
-        config = Config(keystores_path=keystores_dir, keystores_passwords_path=passwords_dir)
+        config = Config(
+            keystores_path=keystores_dir, keystores_passwords_path=passwords_dir
+        )
         assert config.keystores_path == keystores_dir
         assert config.keystores_passwords_path == passwords_dir
 
@@ -32,7 +34,9 @@ class TestKeystoresPathConfig:
         keystores_dir = tmp_path / "keystores"
         keystores_dir.mkdir()
 
-        with pytest.raises(ValueError, match="--keystores-passwords-path must be provided"):
+        with pytest.raises(
+            ValueError, match="--keystores-passwords-path must be provided"
+        ):
             Config(keystores_path=keystores_dir, keystores_passwords_path=None)
 
     def test_only_passwords_path_raises(self, tmp_path: Path) -> None:
@@ -87,7 +91,9 @@ class TestKeystoresPathConfig:
         keystores_dir.mkdir()
         passwords_file.write_text("not a directory")
 
-        with pytest.raises(ValueError, match="keystores_passwords_path must be a directory"):
+        with pytest.raises(
+            ValueError, match="keystores_passwords_path must be a directory"
+        ):
             Config(
                 keystores_path=keystores_dir,
                 keystores_passwords_path=passwords_file,
@@ -212,7 +218,9 @@ class TestTLSConfig:
         cert_file = tmp_path / "cert.pem"
         cert_file.write_text("cert content")
 
-        with pytest.raises(ValueError, match="Both tls_cert and tls_key must be provided"):
+        with pytest.raises(
+            ValueError, match="Both tls_cert and tls_key must be provided"
+        ):
             Config(tls_cert=cert_file, tls_key=None)
 
     def test_only_key_raises(self, tmp_path: Path) -> None:
@@ -220,7 +228,9 @@ class TestTLSConfig:
         key_file = tmp_path / "key.pem"
         key_file.write_text("key content")
 
-        with pytest.raises(ValueError, match="Both tls_cert and tls_key must be provided"):
+        with pytest.raises(
+            ValueError, match="Both tls_cert and tls_key must be provided"
+        ):
             Config(tls_cert=None, tls_key=key_file)
 
     def test_cert_not_exists(self, tmp_path: Path) -> None:

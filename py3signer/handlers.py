@@ -219,7 +219,9 @@ class KeystoreController(Controller):  # type: ignore[misc]
                 )
 
                 if persistence_enabled and not persisted:
-                    logger.warning(f"Failed to persist keystore to disk: {pubkey_hex[:20]}...")
+                    logger.warning(
+                        f"Failed to persist keystore to disk: {pubkey_hex[:20]}..."
+                    )
 
                 existing_keys.add(pubkey_hex)
                 results.append(
@@ -233,7 +235,9 @@ class KeystoreController(Controller):  # type: ignore[misc]
                 results.append(KeystoreImportResult(status="error", message=str(e)))
             except Exception as e:
                 logger.exception("Unexpected error importing keystore")
-                results.append(KeystoreImportResult(status="error", message=f"Internal error: {e}"))
+                results.append(
+                    KeystoreImportResult(status="error", message=f"Internal error: {e}")
+                )
 
         return Response(
             content={"data": [msgspec.to_builtins(r) for r in results]},
@@ -370,7 +374,9 @@ class SigningController(Controller):  # type: ignore[misc]
             ) from e
 
         try:
-            signature = signer.sign_data(pubkey_hex=pubkey_hex, data=message, domain=domain)
+            signature = signer.sign_data(
+                pubkey_hex=pubkey_hex, data=message, domain=domain
+            )
             signature_hex = signature.to_bytes().hex()
             # Return just the raw hex string (not JSON) per Web3Signer API spec
             return Response(

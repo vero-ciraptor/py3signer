@@ -24,7 +24,9 @@ def config_with_keystore_path(tmp_path: Path) -> Config:
     """Create a test configuration with a keystore path."""
     keystore_path = tmp_path / "keystores"
     keystore_path.mkdir()
-    return Config(host="127.0.0.1", port=8080, log_level="DEBUG", key_store_path=keystore_path)
+    return Config(
+        host="127.0.0.1", port=8080, log_level="DEBUG", key_store_path=keystore_path
+    )
 
 
 @pytest.fixture

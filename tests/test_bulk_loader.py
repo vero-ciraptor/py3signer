@@ -148,7 +148,9 @@ class TestLoadKeystoresFromDirectory:
         keystore1_txt = tmp_path / "keystore-m_12381_3600_0_0_0-16777216.txt"
 
         # Copy test keystore
-        keystore_data = json.loads((test_data / "test_keystore_scrypt.json").read_text())
+        keystore_data = json.loads(
+            (test_data / "test_keystore_scrypt.json").read_text()
+        )
         keystore_data["pubkey"] = (
             "97248533cef0908a5ebe52c3b487471301bf6369010e6167f63dd74feddac2dfb5336a59a331d38eb0e454d6f6fcb1a4"
         )
@@ -169,7 +171,9 @@ class TestLoadKeystoresFromDirectory:
         # Valid keystore
         keystore1_json = tmp_path / "keystore1.json"
         keystore1_txt = tmp_path / "keystore1.txt"
-        keystore_data = json.loads((test_data / "test_keystore_scrypt.json").read_text())
+        keystore_data = json.loads(
+            (test_data / "test_keystore_scrypt.json").read_text()
+        )
         keystore1_json.write_text(json.dumps(keystore_data))
         keystore1_txt.write_text("testpassword123")
 
@@ -196,7 +200,9 @@ class TestLoadKeystoresFromDirectory:
         keystore2_json = tmp_path / "keystore2.json"
         keystore2_txt = tmp_path / "keystore2.txt"
 
-        keystore_data = json.loads((test_data / "test_keystore_scrypt.json").read_text())
+        keystore_data = json.loads(
+            (test_data / "test_keystore_scrypt.json").read_text()
+        )
         keystore1_json.write_text(json.dumps(keystore_data))
         keystore1_txt.write_text("testpassword123")
         keystore2_json.write_text(json.dumps(keystore_data))
@@ -237,7 +243,9 @@ class TestBulkLoaderIntegration:
     def test_multiple_valid_keystores(self, tmp_path: Path) -> None:
         """Test loading multiple valid keystores."""
         test_data = Path(__file__).parent / "data"
-        original_keystore = json.loads((test_data / "test_keystore_scrypt.json").read_text())
+        original_keystore = json.loads(
+            (test_data / "test_keystore_scrypt.json").read_text()
+        )
 
         # Create multiple keystores with unique pubkeys
         for i in range(3):
@@ -274,7 +282,9 @@ class TestLoadKeystoresPersistentParameter:
         keystore_json = tmp_path / "keystore-m_12381_3600_0_0_0-16777216.json"
         keystore_txt = tmp_path / "keystore-m_12381_3600_0_0_0-16777216.txt"
 
-        keystore_data = json.loads((test_data / "test_keystore_scrypt.json").read_text())
+        keystore_data = json.loads(
+            (test_data / "test_keystore_scrypt.json").read_text()
+        )
         keystore_data["pubkey"] = (
             "97248533cef0908a5ebe52c3b487471301bf6369010e6167f63dd74feddac2dfb5336a59a331d38eb0e454d6f6fcb1a4"
         )
@@ -282,7 +292,9 @@ class TestLoadKeystoresPersistentParameter:
         keystore_txt.write_text("testpassword123")
 
         storage = KeyStorage()
-        success, failures = load_keystores_from_directory(tmp_path, storage, persistent=False)
+        success, failures = load_keystores_from_directory(
+            tmp_path, storage, persistent=False
+        )
 
         assert success == 1
         assert failures == 0
@@ -311,7 +323,9 @@ class TestLoadInputOnlyKeystores:
 
         # Create keystore in keystores dir
         keystore_json = keystores_dir / "test_keystore.json"
-        keystore_data = json.loads((test_data / "test_keystore_scrypt.json").read_text())
+        keystore_data = json.loads(
+            (test_data / "test_keystore_scrypt.json").read_text()
+        )
         keystore_data["pubkey"] = (
             "97248533cef0908a5ebe52c3b487471301bf6369010e6167f63dd74feddac2dfb5336a59a331d38eb0e454d6f6fcb1a4"
         )
@@ -322,7 +336,9 @@ class TestLoadInputOnlyKeystores:
         password_txt.write_text("testpassword123")
 
         storage = KeyStorage()
-        success, failures = load_input_only_keystores(keystores_dir, passwords_dir, storage)
+        success, failures = load_input_only_keystores(
+            keystores_dir, passwords_dir, storage
+        )
 
         assert success == 1
         assert failures == 0
@@ -346,7 +362,9 @@ class TestLoadInputOnlyKeystores:
         keystore_json.write_text('{"version": 4}')
 
         storage = KeyStorage()
-        success, failures = load_input_only_keystores(keystores_dir, passwords_dir, storage)
+        success, failures = load_input_only_keystores(
+            keystores_dir, passwords_dir, storage
+        )
 
         assert success == 0
         assert failures == 1  # Counts as failure due to missing password
@@ -397,7 +415,9 @@ class TestLoadInputOnlyKeystores:
     def test_multiple_keystores_with_mixed_success(self, tmp_path: Path) -> None:
         """Test loading multiple keystores with some failures."""
         test_data = Path(__file__).parent / "data"
-        original_keystore = json.loads((test_data / "test_keystore_scrypt.json").read_text())
+        original_keystore = json.loads(
+            (test_data / "test_keystore_scrypt.json").read_text()
+        )
 
         keystores_dir = tmp_path / "keystores"
         passwords_dir = tmp_path / "passwords"
@@ -421,7 +441,9 @@ class TestLoadInputOnlyKeystores:
         # No password file for keystore3
 
         storage = KeyStorage()
-        success, failures = load_input_only_keystores(keystores_dir, passwords_dir, storage)
+        success, failures = load_input_only_keystores(
+            keystores_dir, passwords_dir, storage
+        )
 
         assert success == 1  # Only keystore1 succeeds
         assert failures == 2  # keystore2 (bad password) + keystore3 (missing password)
@@ -435,7 +457,9 @@ class TestLoadInputOnlyKeystores:
         passwords_dir.mkdir()
 
         storage = KeyStorage()
-        success, failures = load_input_only_keystores(keystores_dir, passwords_dir, storage)
+        success, failures = load_input_only_keystores(
+            keystores_dir, passwords_dir, storage
+        )
 
         assert success == 0
         assert failures == 0

@@ -5,7 +5,11 @@ import time
 
 from py3signer_core import Signature, sign
 
-from .metrics import SIGNING_DURATION_SECONDS, SIGNING_ERRORS_TOTAL, SIGNING_REQUESTS_TOTAL
+from .metrics import (
+    SIGNING_DURATION_SECONDS,
+    SIGNING_ERRORS_TOTAL,
+    SIGNING_REQUESTS_TOTAL,
+)
 from .storage import KeyStorage
 
 logger = logging.getLogger(__name__)

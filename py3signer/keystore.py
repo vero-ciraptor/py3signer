@@ -71,7 +71,11 @@ class Keystore(msgspec.Struct):
                 "only version 4 (EIP-2335) is supported"
             )
 
-        if "kdf" not in self.crypto or "checksum" not in self.crypto or "cipher" not in self.crypto:
+        if (
+            "kdf" not in self.crypto
+            or "checksum" not in self.crypto
+            or "cipher" not in self.crypto
+        ):
             raise KeystoreError("Invalid crypto structure")
 
     @classmethod
@@ -120,6 +124,10 @@ class Keystore(msgspec.Struct):
             return SecretKey.from_bytes(secret_bytes)
         except Exception as e:
             error_msg = str(e).lower()
-            if "checksum" in error_msg or "password" in error_msg or "invalid" in error_msg:
+            if (
+                "checksum" in error_msg
+                or "password" in error_msg
+                or "invalid" in error_msg
+            ):
                 raise KeystoreError("Invalid password")
             raise KeystoreError(f"Decryption failed: {e}")
