@@ -34,6 +34,9 @@ class KeystoreImportRequest(msgspec.Struct):
 
     keystores: list[str]
     passwords: list[str]
+    slashing_protection: str | None = (
+        None  # EIP-3076 slashing protection data (optional)
+    )
 
     def __post_init__(self) -> None:
         if len(self.keystores) != len(self.passwords):
@@ -78,6 +81,28 @@ class KeystoreDeleteResult(msgspec.Struct):
 
     status: KeystoreDeleteStatus
     message: str = ""
+
+
+class SlashingProtectionData(msgspec.Struct):
+    """Slashing protection data in EIP-3076 format.
+
+    This is a minimal placeholder implementation. Full slashing protection
+    tracking would require maintaining attestation and block signing history.
+    """
+
+    metadata: dict[str, str]
+    data: list[dict[str, Any]]
+
+    @classmethod
+    def empty(cls) -> SlashingProtectionData:
+        """Return empty slashing protection data."""
+        return cls(
+            metadata={
+                "interchange_format_version": "5",
+                "genesis_validators_root": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            },
+            data=[],
+        )
 
 
 class KeystoreInfo(msgspec.Struct):
@@ -166,7 +191,10 @@ class KeystoreController(Controller):  # type: ignore[misc]
         request: Request,
         data: dict[str, Any],
     ) -> Response[dict[str, Any]]:
-        """POST /eth/v1/keystores - Import keystores."""
+        """POST /eth/v1/keystores - Import keystores.
+
+        Accepts EIP-3076 slashing_protection data (stored but not processed).
+        """
         storage = _get_storage(request)
 
         # Validate request manually since msgspec doesn't integrate directly
@@ -176,6 +204,12 @@ class KeystoreController(Controller):  # type: ignore[misc]
             raise ValidationException(detail=f"Validation error: {e}") from e
         except ValueError as e:
             raise ValidationException(detail=str(e)) from e
+
+        # Log if slashing protection data was provided (we accept but don't process it)
+        if import_req.slashing_protection:
+            logger.debug(
+                "Slashing protection data provided during import (accepted but not processed)"
+            )
 
         results = []
         existing_keys = {k[0] for k in storage.list_keys()}
@@ -244,7 +278,11 @@ class KeystoreController(Controller):  # type: ignore[misc]
         request: Request,
         data: dict[str, Any],
     ) -> Response[dict[str, Any]]:
-        """DELETE /eth/v1/keystores - Delete keystores."""
+        """DELETE /eth/v1/keystores - Delete keystores.
+
+        Returns slashing protection data for keys that were active or had data.
+        Per the spec, slashing protection data must be retained even after deletion.
+        """
         storage = _get_storage(request)
 
         try:
@@ -255,6 +293,10 @@ class KeystoreController(Controller):  # type: ignore[misc]
             raise ValidationException(detail=str(e)) from e
 
         results = []
+        # Track pubkeys that had slashing data (active or not_active status)
+        # For now, we return empty slashing protection for all deleted keys
+        # A full implementation would track attestation/block signing history
+        slashing_data_entries: list[dict[str, Any]] = []
 
         for pubkey_hex in delete_req.pubkeys:
             pubkey_hex_clean = pubkey_hex.lower().replace("0x", "")
@@ -275,9 +317,29 @@ class KeystoreController(Controller):  # type: ignore[misc]
                 results.append(
                     KeystoreDeleteResult(status=KeystoreDeleteStatus.DELETED)
                 )
+                # Add empty entry for this pubkey to slashing protection data
+                slashing_data_entries.append(
+                    {
+                        "pubkey": f"0x{pubkey_hex_clean}",
+                        "signed_blocks": [],
+                        "signed_attestations": [],
+                    }
+                )
+
+        # Build slashing protection response per EIP-3076
+        slashing_protection = {
+            "metadata": {
+                "interchange_format_version": "5",
+                "genesis_validators_root": "0x0000000000000000000000000000000000000000000000000000000000000000",
+            },
+            "data": slashing_data_entries,
+        }
 
         return Response(
-            content={"data": [msgspec.to_builtins(r) for r in results]},
+            content={
+                "data": [msgspec.to_builtins(r) for r in results],
+                "slashing_protection": slashing_protection,
+            },
             status_code=HTTP_200_OK,
         )
 

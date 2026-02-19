@@ -1166,3 +1166,103 @@ async def test_sign_accept_header_text_plain(
     assert resp.headers["content-type"] == "text/plain; charset=utf-8"
 
     _assert_signature_format(resp.text)
+
+
+@pytest.mark.asyncio
+async def test_delete_keystore_returns_slashing_protection(
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+) -> None:
+    """Test that DELETE /eth/v1/keystores returns slashing_protection field per spec."""
+    # First import a keystore
+    keystore_json = json.dumps(sample_keystore)
+    await client.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
+    )
+
+    # Delete the keystore
+    resp = await client.request(
+        "DELETE",
+        "/eth/v1/keystores",
+        content=json.dumps({"pubkeys": [sample_keystore["pubkey"]]}),
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
+
+    data = resp.json()
+    # Per Keymanager API spec, response MUST include slashing_protection
+    assert "slashing_protection" in data, (
+        f"Expected 'slashing_protection' in response, got {data.keys()}"
+    )
+
+    slashing = data["slashing_protection"]
+    assert "metadata" in slashing, "Expected 'metadata' in slashing_protection"
+    assert "data" in slashing, "Expected 'data' in slashing_protection"
+    assert slashing["metadata"]["interchange_format_version"] == "5"
+    assert "genesis_validators_root" in slashing["metadata"]
+
+    # Should have one entry for the deleted key
+    assert len(slashing["data"]) == 1
+    # Pubkey may have 0x prefix
+    returned_pubkey = slashing["data"][0]["pubkey"].replace("0x", "")
+    expected_pubkey = sample_keystore["pubkey"].replace("0x", "")
+    assert returned_pubkey == expected_pubkey
+    assert "signed_blocks" in slashing["data"][0]
+    assert "signed_attestations" in slashing["data"][0]
+
+
+@pytest.mark.asyncio
+async def test_delete_keystore_slashing_protection_empty_for_not_found(
+    client: AsyncTestClient,
+) -> None:
+    """Test that slashing_protection is empty when deleting non-existent keys."""
+    resp = await client.request(
+        "DELETE",
+        "/eth/v1/keystores",
+        content=json.dumps({"pubkeys": ["0x" + "a" * 96]}),
+    )
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert "slashing_protection" in data
+    # No slashing data for keys that were not found/deleted
+    assert data["slashing_protection"]["data"] == []
+
+
+@pytest.mark.asyncio
+async def test_import_keystore_accepts_slashing_protection(
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+) -> None:
+    """Test that POST /eth/v1/keystores accepts optional slashing_protection field."""
+    keystore_json = json.dumps(sample_keystore)
+
+    # Import with slashing_protection data
+    slashing_data = json.dumps(
+        {
+            "metadata": {
+                "interchange_format_version": "5",
+                "genesis_validators_root": "0x" + "00" * 32,
+            },
+            "data": [],
+        }
+    )
+
+    resp = await client.post(
+        "/eth/v1/keystores",
+        json={
+            "keystores": [keystore_json],
+            "passwords": [sample_keystore_password],
+            "slashing_protection": slashing_data,
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
+
+    data = resp.json()
+    assert "data" in data
+    assert len(data["data"]) == 1
+    assert data["data"][0]["status"] == "imported"
