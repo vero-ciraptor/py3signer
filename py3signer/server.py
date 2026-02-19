@@ -1,7 +1,6 @@
 """Litestar server setup with Granian ASGI server."""
 
 import logging
-import ssl
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -78,35 +77,40 @@ async def run_server(config: Config) -> None:
     """Run the Litestar server with Granian."""
     logger.info(f"Starting py3signer on {config.host}:{config.port}")
 
-    # Create app
-    app = create_app(config)
-
-    # Setup SSL if configured
-    ssl_context: ssl.SSLContext | None = None
-    if config.tls_cert and config.tls_key:
-        ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        ssl_context.load_cert_chain(str(config.tls_cert), str(config.tls_key))
-        logger.info("TLS enabled")
-
     # Import Granian
     from granian import Granian
     from granian.constants import Interfaces
 
-    # Run with Granian ASGI
+    # Import asgi module to store config
+    from . import asgi
+    asgi.store_config_in_env(config)
+
+    # Run with Granian ASGI using factory pattern for multi-worker support
+    import multiprocessing
+    workers = getattr(config, 'workers', multiprocessing.cpu_count())
+    
+    # Build ssl_key and ssl_cert for Granian
+    ssl_key = str(config.tls_key) if config.tls_key else None
+    ssl_cert = str(config.tls_cert) if config.tls_cert else None
+    
     server = Granian(
-        target=app,
+        target="py3signer.asgi:app",
         address=config.host,
         port=config.port,
         interface=Interfaces.ASGI,
-        ssl_context=ssl_context,
-        workers=1,  # Default to single worker for now
+        workers=workers,
+        ssl_key=ssl_key,
+        ssl_cert=ssl_cert,
     )
 
-    protocol = "https" if ssl_context else "http"
-    logger.info(f"Server running at {protocol}://{config.host}:{config.port}")
-    logger.info("Press Ctrl+C to stop")
+    # Start metrics server in the main process (not workers)
+    from .metrics import MetricsServer
+    metrics_server = MetricsServer(host=config.metrics_host, port=config.metrics_port)
+    await metrics_server.start()
 
     try:
         server.serve()
     except KeyboardInterrupt:
         logger.info("Shutting down...")
+    finally:
+        await metrics_server.stop()

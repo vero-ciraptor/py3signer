@@ -5,6 +5,7 @@ Metrics are opt-in and only collected when --metrics-enabled is set.
 """
 
 import logging
+import threading
 import time
 from typing import Any
 
@@ -138,3 +139,71 @@ class MetricsController(Controller):  # type: ignore[misc]
     async def health(self) -> dict[str, str]:
         """Health check for metrics server."""
         return {"status": "healthy"}
+
+
+# Standalone metrics server for multi-process scenarios using threaded HTTP server
+
+class MetricsServer:
+    """Standalone Prometheus metrics HTTP server using basic threaded HTTP server."""
+
+    def __init__(self, host: str = "127.0.0.1", port: int = 8081) -> None:
+        self._host = host
+        self._port = port
+        self._server = None
+        self._thread = None
+        self._running = False
+
+    async def start(self) -> None:
+        """Start the metrics server in a background thread."""
+        from http.server import HTTPServer, BaseHTTPRequestHandler
+
+        class MetricsHandler(BaseHTTPRequestHandler):
+            """HTTP handler for metrics endpoint."""
+
+            def log_message(self, format, *args):
+                # Suppress default logging
+                pass
+
+            def do_GET(self):
+                if self.path == "/metrics":
+                    self.send_response(200)
+                    self.send_header("Content-Type", get_metrics_content_type())
+                    self.end_headers()
+                    self.wfile.write(get_metrics_output())
+                elif self.path == "/health":
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(b'{"status": "healthy"}')
+                else:
+                    self.send_response(404)
+                    self.end_headers()
+
+        def run_server():
+            """Run the HTTP server."""
+            self._server = HTTPServer((self._host, self._port), MetricsHandler)
+            logger.info(f"Metrics server running at http://self._host:self._port/metrics")
+            while self._running:
+                try:
+                    self._server.handle_request()
+                except Exception:
+                    break
+
+        self._running = True
+        self._thread = threading.Thread(target=run_server, daemon=True)
+        self._thread.start()
+        logger.info(f"Metrics server started at http://self._host:self._port/metrics")
+
+    async def stop(self) -> None:
+        """Stop the metrics server."""
+        self._running = False
+        if self._server:
+            # Close the server socket to wake up the thread
+            try:
+                self._server.server_close()
+            except Exception:
+                pass
+            self._server = None
+        if self._thread:
+            self._thread.join(timeout=2)
+        logger.info("Metrics server stopped")

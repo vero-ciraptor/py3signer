@@ -1,6 +1,7 @@
 """Configuration management using msgspec Struct."""
 
 import argparse
+import multiprocessing
 from pathlib import Path
 
 import msgspec
@@ -33,6 +34,9 @@ class Config(msgspec.Struct, frozen=True):
     # Input-only keystore directories (not persisted)
     keystores_path: Path | None = None
     keystores_passwords_path: Path | None = None
+
+    # Worker settings
+    workers: int = multiprocessing.cpu_count()
 
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
@@ -93,6 +97,10 @@ class Config(msgspec.Struct, frozen=True):
                     f"keystores_passwords_path must be a directory: {self.keystores_passwords_path}"
                 )
 
+        # Validate workers
+        if self.workers < 1:
+            raise ValueError(f"workers must be at least 1, got {self.workers}")
+
     @property
     def normalized_log_level(self) -> str:
         """Return normalized uppercase log level."""
@@ -149,6 +157,12 @@ def get_config() -> Config:
         default=None,
         help="Path to directory containing input-only password .txt files (not persisted)",
     )
+    parser.add_argument(
+        "-w", "--workers",
+        type=int,
+        default=multiprocessing.cpu_count(),
+        help=f"Number of worker processes (default: {multiprocessing.cpu_count()})",
+    )
 
     args = parser.parse_args()
 
@@ -165,6 +179,7 @@ def get_config() -> Config:
         "key_store_path": args.key_store_path,
         "keystores_path": args.keystores_path,
         "keystores_passwords_path": args.keystores_passwords_path,
+        "workers": args.workers,
     }
 
     # Create config from dict using msgspec convert
