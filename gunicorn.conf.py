@@ -1,9 +1,12 @@
 """Gunicorn configuration for py3signer."""
 
+import asyncio
 import multiprocessing
 import os
 import shutil
 import tempfile
+import threading
+from aiohttp import web
 
 # Multi-process metrics directory
 PROMETHEUS_MULTIPROC_DIR = os.getenv(
@@ -62,6 +65,52 @@ preload_app = os.getenv("PY3SIGNER_PRELOAD_APP", "false").lower() == "true"
 # statsd_host = os.getenv("PY3SIGNER_STATSD_HOST")
 # statsd_prefix = os.getenv("PY3SIGNER_STATSD_PREFIX", "py3signer")
 
+# Metrics server globals
+_metrics_server_thread = None
+_metrics_server_runner = None
+_metrics_server_loop = None
+
+
+def _run_metrics_server(host: str, port: int):
+    """Run the metrics server in a background thread."""
+    global _metrics_server_runner, _metrics_server_loop
+    
+    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST, CollectorRegistry, multiprocess
+    
+    async def metrics_handler(request):
+        """Handler for Prometheus metrics endpoint."""
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        data = generate_latest(registry)
+        return web.Response(body=data, headers={"Content-Type": CONTENT_TYPE_LATEST})
+    
+    async def health_handler(request):
+        """Health check for metrics server."""
+        return web.json_response({"status": "healthy", "component": "metrics"})
+    
+    # Create app
+    app = web.Application()
+    app.router.add_get("/metrics", metrics_handler)
+    app.router.add_get("/health", health_handler)
+    
+    # Run server
+    _metrics_server_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(_metrics_server_loop)
+    
+    _metrics_server_runner = web.AppRunner(app)
+    _metrics_server_loop.run_until_complete(_metrics_server_runner.setup())
+    
+    site = web.TCPSite(_metrics_server_runner, host=host, port=port)
+    _metrics_server_loop.run_until_complete(site.start())
+    
+    print(f"Metrics server running at http://{host}:{port}/metrics", flush=True)
+    
+    # Run forever
+    try:
+        _metrics_server_loop.run_forever()
+    except Exception:
+        pass
+
 
 def on_starting(server):
     """Called just before the master process is initialized."""
@@ -74,8 +123,20 @@ def on_reload(server):
 
 
 def when_ready(server):
-    """Called just after the server is started."""
-    pass
+    """Called just after the server is started - start metrics server."""
+    global _metrics_server_thread
+    
+    # Get metrics host/port from env (set by entrypoint)
+    metrics_host = os.getenv("PY3SIGNER_METRICS_HOST", "127.0.0.1")
+    metrics_port = int(os.getenv("PY3SIGNER_METRICS_PORT", "8081"))
+    
+    # Start metrics server in background thread
+    _metrics_server_thread = threading.Thread(
+        target=_run_metrics_server,
+        args=(metrics_host, metrics_port),
+        daemon=True
+    )
+    _metrics_server_thread.start()
 
 
 def worker_int(worker):
@@ -89,7 +150,24 @@ def worker_abort(worker):
 
 
 def on_exit(server):
-    """Called just before exiting gunicorn."""
+    """Called just before exiting gunicorn - stop metrics server."""
+    global _metrics_server_runner, _metrics_server_loop, _metrics_server_thread
+    
+    # Stop metrics server
+    if _metrics_server_loop and _metrics_server_runner:
+        try:
+            asyncio.run_coroutine_threadsafe(
+                _metrics_server_runner.cleanup(), 
+                _metrics_server_loop
+            )
+            _metrics_server_loop.call_soon_threadsafe(_metrics_server_loop.stop)
+        except Exception:
+            pass
+    
+    # Wait for thread to finish
+    if _metrics_server_thread and _metrics_server_thread.is_alive():
+        _metrics_server_thread.join(timeout=2)
+    
     # Clean up prometheus multiproc directory
     prom_dir = os.environ.get("PROMETHEUS_MULTIPROC_DIR")
     if prom_dir and os.path.exists(prom_dir):

@@ -8,11 +8,7 @@ from aiohttp import web
 from py3signer.bulk_loader import load_input_only_keystores, load_keystores_from_directory
 from py3signer.config import Config, get_config
 from py3signer.handlers import APIHandler, setup_routes
-from py3signer.metrics import (
-    get_metrics_content_type,
-    get_metrics_output,
-    setup_metrics_middleware,
-)
+from py3signer.metrics import setup_metrics_middleware
 from py3signer.signer import Signer
 from py3signer.storage import KeyStorage
 
@@ -28,14 +24,6 @@ def setup_logging(log_level: str) -> None:
     logging.basicConfig(
         level=getattr(logging, log_level),
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    )
-
-
-async def metrics_handler(request: web.Request) -> web.Response:
-    """Handler for Prometheus metrics endpoint."""
-    return web.Response(
-        body=get_metrics_output(),
-        headers={"Content-Type": get_metrics_content_type()},
     )
 
 
@@ -77,10 +65,10 @@ def create_aiohttp_app(config: Config | None = None) -> web.Application:
     # Setup routes
     setup_routes(app, handler)
 
-    # Add metrics endpoint to main app (for gunicorn multi-worker compatibility)
-    app.router.add_get("/metrics", metrics_handler)
+    # Note: Metrics are served on a separate port (default 8081) by gunicorn.conf.py
+    # We do NOT add /metrics to the main app to avoid exposing metrics on the API port
 
-    # Setup metrics middleware
+    # Setup metrics middleware (for tracking HTTP metrics)
     setup_metrics_middleware(app)
 
     return app
