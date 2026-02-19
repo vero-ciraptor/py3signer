@@ -265,10 +265,11 @@ class TestBulkLoaderIntegration:
 
         # This will fail to decrypt but that's expected - we're testing the flow
         storage = KeyStorage()
-        _success, failures = load_keystores_from_directory(tmp_path, storage)
+        success, _failures = load_keystores_from_directory(tmp_path, storage)
 
-        # TODO there is some weirdness here
-        assert failures == 3
+        # TODO look into why this is not passing
+        assert success == 0
+        assert _failures == 3
 
         # All will fail due to pubkey mismatch or decryption failure
         # but the scanner should find them
