@@ -28,11 +28,13 @@ async def test_health_endpoint(client: AsyncTestClient) -> None:
     """Test the health check endpoint."""
     resp = await client.get("/health")
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
     assert data["status"] == "healthy"
     assert "keys_loaded" in data
     assert data["keys_loaded"] == 0
+    assert isinstance(data["keys_loaded"], int)
 
 
 @pytest.mark.parametrize(
@@ -51,11 +53,14 @@ async def test_list_empty(
     """Test listing endpoints when none are loaded."""
     resp = await client.get(endpoint)
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
     if extract_key:
+        assert extract_key in data, f"Expected '{extract_key}' key in response"
         data = data.get(extract_key)
-    assert data == []
+    assert data == [], f"Expected empty list, got {data}"
+    assert isinstance(data, list)
 
 
 @pytest.mark.asyncio
@@ -67,6 +72,11 @@ async def test_import_keystore_invalid_json(client: AsyncTestClient) -> None:
         headers={"Content-Type": "application/json"},
     )
     assert resp.status_code == 400
+    assert resp.headers["content-type"] == "application/json"
+
+    data = resp.json()
+    assert "detail" in data
+    assert "JSON" in data["detail"] or "validation" in data["detail"].lower()
 
 
 @pytest.mark.parametrize(
@@ -93,9 +103,11 @@ async def test_import_keystore_validation_errors(
         json={"keystores": keystores, "passwords": passwords},
     )
     assert resp.status_code == 400
+    assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
-    assert expected_error in data["detail"]
+    assert "detail" in data, f"Expected 'detail' key in error response, got {data}"
+    assert expected_error in data["detail"], f"Expected '{expected_error}' in '{data['detail']}'"
 
 
 @pytest.mark.asyncio
@@ -112,10 +124,14 @@ async def test_import_keystore_success(
         json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
     )
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
-    assert len(data["data"]) == 1
-    assert data["data"][0]["status"] == "imported"
+    assert "data" in data, f"Expected 'data' key in response, got {data}"
+    assert len(data["data"]) == 1, f"Expected 1 result, got {len(data['data'])}"
+    assert data["data"][0]["status"] == "imported", f"Expected status 'imported', got {data['data'][0]}"
+    assert "message" in data["data"][0], "Expected 'message' field in result"
+    assert sample_keystore["pubkey"] in data["data"][0]["message"]
 
 
 @pytest.mark.asyncio
@@ -131,9 +147,14 @@ async def test_import_keystore_wrong_password(
         json={"keystores": [keystore_json], "passwords": ["wrongpassword"]},
     )
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
-    assert data["data"][0]["status"] == "error"
+    assert "data" in data, f"Expected 'data' key in response, got {data}"
+    assert len(data["data"]) == 1, f"Expected 1 result, got {len(data['data'])}"
+    assert data["data"][0]["status"] == "error", f"Expected status 'error', got {data['data'][0]}"
+    assert "message" in data["data"][0], "Expected 'message' field in error result"
+    assert "password" in data["data"][0]["message"].lower() or "invalid" in data["data"][0]["message"].lower()
 
 
 @pytest.mark.asyncio
@@ -153,11 +174,14 @@ async def test_list_keystores_after_import(
     # Then list
     resp = await client.get("/eth/v1/keystores")
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
-    assert len(data["data"]) == 1
+    assert "data" in data, f"Expected 'data' key in response, got {data}"
+    assert len(data["data"]) == 1, f"Expected 1 keystore, got {len(data['data'])}"
     assert data["data"][0]["validating_pubkey"] == sample_keystore["pubkey"]
     assert data["data"][0]["derivation_path"] == sample_keystore["path"]
+    assert data["data"][0]["readonly"] is False
 
 
 @pytest.mark.asyncio
@@ -181,14 +205,17 @@ async def test_delete_keystore(
         content=json.dumps({"pubkeys": [sample_keystore["pubkey"]]}),
     )
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
-    assert data["data"][0]["status"] == "deleted"
+    assert "data" in data, f"Expected 'data' key in response, got {data}"
+    assert len(data["data"]) == 1, f"Expected 1 result, got {len(data['data'])}"
+    assert data["data"][0]["status"] == "deleted", f"Expected status 'deleted', got {data['data'][0]}"
 
     # Verify it's gone
     resp = await client.get("/eth/v1/keystores")
     data = resp.json()
-    assert len(data["data"]) == 0
+    assert len(data["data"]) == 0, f"Expected 0 keystores after delete, got {len(data['data'])}"
 
 
 @pytest.mark.asyncio
@@ -200,9 +227,12 @@ async def test_delete_nonexistent_keystore(client: AsyncTestClient) -> None:
         content=json.dumps({"pubkeys": ["a" * 96]}),
     )
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
-    assert data["data"][0]["status"] == "not_found"
+    assert "data" in data, f"Expected 'data' key in response, got {data}"
+    assert len(data["data"]) == 1, f"Expected 1 result, got {len(data['data'])}"
+    assert data["data"][0]["status"] == "not_found", f"Expected status 'not_found', got {data['data'][0]}"
 
 
 @pytest.mark.asyncio
@@ -214,6 +244,11 @@ async def test_delete_empty_pubkeys(client: AsyncTestClient) -> None:
         content=json.dumps({"pubkeys": []}),
     )
     assert resp.status_code == 400
+    assert resp.headers["content-type"] == "application/json"
+
+    data = resp.json()
+    assert "detail" in data, f"Expected 'detail' key in error response, got {data}"
+    assert "pubkeys must not be empty" in data["detail"] or "empty" in data["detail"].lower()
 
 
 @pytest.mark.asyncio
@@ -221,15 +256,23 @@ async def test_remote_keys_stub(client: AsyncTestClient) -> None:
     """Test remote keys endpoints return stubs."""
     resp = await client.get("/eth/v1/remotekeys")
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
-    assert data["data"] == []
+    assert "data" in data, f"Expected 'data' key in response, got {data}"
+    assert data["data"] == [], f"Expected empty list, got {data['data']}"
 
     resp = await client.post("/eth/v1/remotekeys")
     assert resp.status_code == 501
+    assert resp.headers["content-type"] == "application/json"
+    data = resp.json()
+    assert "message" in data or "detail" in data
 
     resp = await client.delete("/eth/v1/remotekeys")
     assert resp.status_code == 501
+    assert resp.headers["content-type"] == "application/json"
+    data = resp.json()
+    assert "message" in data or "detail" in data
 
 
 @pytest.mark.asyncio
@@ -249,21 +292,30 @@ async def test_list_public_keys_after_import(
     # Then list public keys via Remote Signing API
     resp = await client.get("/api/v1/eth2/publicKeys")
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
-    assert len(data) == 1
+    assert isinstance(data, list), f"Expected list, got {type(data)}"
+    assert len(data) == 1, f"Expected 1 public key, got {len(data)}"
     # API returns pubkey with "0x" prefix
     expected_pubkey = sample_keystore["pubkey"]
     if not expected_pubkey.startswith("0x"):
         expected_pubkey = "0x" + expected_pubkey
-    assert data[0] == expected_pubkey
+    assert data[0] == expected_pubkey, f"Expected {expected_pubkey}, got {data[0]}"
+    assert data[0].startswith("0x"), f"Expected pubkey to start with 0x, got {data[0]}"
+    assert len(data[0]) == 98, f"Expected 98 chars (0x + 96 hex), got {len(data[0])}"
 
 
 @pytest.mark.asyncio
 async def test_sign_missing_identifier(client: AsyncTestClient) -> None:
     """Test signing without identifier."""
     resp = await client.post("/api/v1/eth2/sign/", json={})
-    assert resp.status_code in [404, 405]  # Route not found or method not allowed
+    assert resp.status_code in [404, 405], f"Expected 404 or 405, got {resp.status_code}"
+
+    if resp.status_code == 405:
+        assert resp.headers["content-type"] == "application/json"
+        data = resp.json()
+        assert "detail" in data
 
 
 # Keystore persistence tests
@@ -346,9 +398,14 @@ async def test_import_duplicate_keystore(
         json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
     )
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
-    assert data["data"][0]["status"] == "duplicate"
+    assert "data" in data, f"Expected 'data' key in response, got {data}"
+    assert len(data["data"]) == 1, f"Expected 1 result, got {len(data['data'])}"
+    assert data["data"][0]["status"] == "duplicate", f"Expected status 'duplicate', got {data['data'][0]}"
+    assert "message" in data["data"][0], "Expected 'message' field in result"
+    assert sample_keystore["pubkey"] in data["data"][0]["message"] or "already exists" in data["data"][0]["message"].lower()
 
 
 @pytest.mark.parametrize(
@@ -428,6 +485,11 @@ async def test_sign_key_not_found(
         },
     )
     assert resp.status_code == 404
+    assert resp.headers["content-type"] == "application/json"
+
+    data = resp.json()
+    assert "detail" in data, f"Expected 'detail' key in error response, got {data}"
+    assert "not found" in data["detail"].lower(), f"Expected 'not found' in '{data['detail']}'"
 
 
 @pytest.mark.asyncio
@@ -452,9 +514,11 @@ async def test_sign_missing_signing_root(
         },
     )
     assert resp.status_code == 400
+    assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
-    assert "signing_root is required" in data.get("detail", "")
+    assert "detail" in data, f"Expected 'detail' key in error response, got {data}"
+    assert "signing_root is required" in data.get("detail", ""), f"Expected 'signing_root is required' in '{data.get('detail', '')}'"
 
 
 @pytest.mark.asyncio
@@ -492,11 +556,17 @@ async def test_sign_attestation(
         },
     )
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "text/plain; charset=utf-8"
 
     data = resp.text
     # Response is now a plain hex string per Web3Signer API spec
-    assert data.startswith("0x")
-    assert len(data) == 194  # 0x + 96 bytes * 2 = 194
+    assert data.startswith("0x"), f"Expected signature to start with 0x, got {data[:10]}"
+    assert len(data) == 194, f"Expected 194 chars (0x + 96 bytes * 2), got {len(data)}"
+    # Verify it's valid hex
+    try:
+        int(data, 16)
+    except ValueError:
+        pytest.fail(f"Signature is not valid hex: {data}")
 
 
 @pytest.mark.asyncio
@@ -528,11 +598,17 @@ async def test_sign_randao(
         },
     )
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "text/plain; charset=utf-8"
 
     data = resp.text
     # Response is now a plain hex string per Web3Signer API spec
-    assert data.startswith("0x")
-    assert len(data) == 194  # 0x + 96 bytes * 2 = 194
+    assert data.startswith("0x"), f"Expected signature to start with 0x, got {data[:10]}"
+    assert len(data) == 194, f"Expected 194 chars (0x + 96 bytes * 2), got {len(data)}"
+    # Verify it's valid hex
+    try:
+        int(data, 16)
+    except ValueError:
+        pytest.fail(f"Signature is not valid hex: {data}")
 
 
 @pytest.mark.asyncio
@@ -564,11 +640,17 @@ async def test_sign_voluntary_exit(
         },
     )
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "text/plain; charset=utf-8"
 
     data = resp.text
     # Response is now a plain hex string per Web3Signer API spec
-    assert data.startswith("0x")
-    assert len(data) == 194  # 0x + 96 bytes * 2 = 194
+    assert data.startswith("0x"), f"Expected signature to start with 0x, got {data[:10]}"
+    assert len(data) == 194, f"Expected 194 chars (0x + 96 bytes * 2), got {len(data)}"
+    # Verify it's valid hex
+    try:
+        int(data, 16)
+    except ValueError:
+        pytest.fail(f"Signature is not valid hex: {data}")
 
 
 @pytest.mark.asyncio
@@ -609,11 +691,17 @@ async def test_sign_block_v2(
         },
     )
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "text/plain; charset=utf-8"
 
     data = resp.text
     # Response is now a plain hex string per Web3Signer API spec
-    assert data.startswith("0x")
-    assert len(data) == 194  # 0x + 96 bytes * 2 = 194
+    assert data.startswith("0x"), f"Expected signature to start with 0x, got {data[:10]}"
+    assert len(data) == 194, f"Expected 194 chars (0x + 96 bytes * 2), got {len(data)}"
+    # Verify it's valid hex
+    try:
+        int(data, 16)
+    except ValueError:
+        pytest.fail(f"Signature is not valid hex: {data}")
 
 
 @pytest.mark.asyncio
@@ -631,15 +719,18 @@ async def test_full_flow(
         json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
     )
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
     data = resp.json()
-    assert data["data"][0]["status"] == "imported"
+    assert data["data"][0]["status"] == "imported", f"Import failed: {data}"
 
     # 2. List
     resp = await client.get("/eth/v1/keystores")
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
     data = resp.json()
-    assert len(data["data"]) == 1
+    assert len(data["data"]) == 1, f"Expected 1 keystore, got {len(data['data'])}"
     pubkey = data["data"][0]["validating_pubkey"]
+    assert pubkey == sample_keystore["pubkey"], f"Pubkey mismatch: {pubkey} != {sample_keystore['pubkey']}"
 
     # 3. Sign with spec-compliant format (expects text/plain)
     resp = await client.post(
@@ -659,10 +750,16 @@ async def test_full_flow(
         },
     )
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "text/plain; charset=utf-8"
     data = resp.text
     # Response is now a plain hex string per Web3Signer API spec
-    assert data.startswith("0x")
-    assert len(data) == 194  # 0x + 96 bytes * 2 = 194
+    assert data.startswith("0x"), f"Expected signature to start with 0x, got {data[:10]}"
+    assert len(data) == 194, f"Expected 194 chars, got {len(data)}"
+    # Verify it's valid hex
+    try:
+        int(data, 16)
+    except ValueError:
+        pytest.fail(f"Signature is not valid hex: {data}")
 
     # 4. Delete
     resp = await client.request(
@@ -671,14 +768,16 @@ async def test_full_flow(
         content=json.dumps({"pubkeys": [pubkey]}),
     )
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
     data = resp.json()
-    assert data["data"][0]["status"] == "deleted"
+    assert data["data"][0]["status"] == "deleted", f"Delete failed: {data}"
 
     # 5. Verify deleted
     resp = await client.get("/eth/v1/keystores")
     assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
     data = resp.json()
-    assert len(data["data"]) == 0
+    assert len(data["data"]) == 0, f"Expected 0 keystores after delete, got {len(data['data'])}"
 
 
 @pytest.mark.asyncio
@@ -713,9 +812,14 @@ async def test_sign_accept_header_json(
     assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
-    assert "signature" in data
-    assert data["signature"].startswith("0x")
-    assert len(data["signature"]) == 194  # 0x + 96 bytes * 2 = 194
+    assert "signature" in data, f"Expected 'signature' in response, got {data}"
+    assert data["signature"].startswith("0x"), f"Expected signature to start with 0x, got {data['signature'][:10]}"
+    assert len(data["signature"]) == 194, f"Expected 194 chars (0x + 96 bytes * 2), got {len(data['signature'])}"
+    # Verify it's valid hex
+    try:
+        int(data["signature"], 16)
+    except ValueError:
+        pytest.fail(f"Signature is not valid hex: {data['signature']}")
 
 
 @pytest.mark.asyncio
@@ -749,8 +853,9 @@ async def test_sign_accept_header_missing_returns_json(
     assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
-    assert "signature" in data
+    assert "signature" in data, f"Expected 'signature' in response, got {data}"
     assert data["signature"].startswith("0x")
+    assert len(data["signature"]) == 194
 
 
 @pytest.mark.asyncio
@@ -785,8 +890,245 @@ async def test_sign_accept_header_wildcard_returns_json(
     assert resp.headers["content-type"] == "application/json"
 
     data = resp.json()
-    assert "signature" in data
+    assert "signature" in data, f"Expected 'signature' in response, got {data}"
     assert data["signature"].startswith("0x")
+    assert len(data["signature"]) == 194
+
+
+@pytest.mark.asyncio
+async def test_import_keystore_with_invalid_version(
+    client: AsyncTestClient,
+) -> None:
+    """Test importing a keystore with unsupported version."""
+    invalid_keystore = {
+        "version": 3,  # Unsupported version
+        "pubkey": "a" * 96,
+        "path": "m/12381/3600/0/0/0",
+        "uuid": "test-uuid",
+        "crypto": {
+            "kdf": {"function": "scrypt", "params": {}, "message": ""},
+            "checksum": {"function": "sha256", "params": {}, "message": "aa" * 32},
+            "cipher": {"function": "aes-128-ctr", "params": {"iv": "aa" * 16}, "message": "aa" * 16},
+        },
+    }
+    keystore_json = json.dumps(invalid_keystore)
+
+    resp = await client.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": ["password"]},
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
+
+    data = resp.json()
+    assert "data" in data
+    assert len(data["data"]) == 1
+    assert data["data"][0]["status"] == "error"
+    assert "version" in data["data"][0]["message"].lower() or "not supported" in data["data"][0]["message"].lower()
+
+
+@pytest.mark.asyncio
+async def test_delete_keystore_with_0x_prefix(
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+) -> None:
+    """Test deleting a keystore using pubkey with 0x prefix."""
+    # First import
+    keystore_json = json.dumps(sample_keystore)
+    await client.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
+    )
+
+    # Delete with 0x prefix
+    pubkey_with_prefix = "0x" + sample_keystore["pubkey"]
+    resp = await client.request(
+        "DELETE",
+        "/eth/v1/keystores",
+        content=json.dumps({"pubkeys": [pubkey_with_prefix]}),
+    )
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert data["data"][0]["status"] == "deleted"
+
+
+@pytest.mark.asyncio
+async def test_delete_keystore_with_uppercase_pubkey(
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+) -> None:
+    """Test deleting a keystore using uppercase pubkey (case insensitive)."""
+    # First import
+    keystore_json = json.dumps(sample_keystore)
+    await client.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
+    )
+
+    # Delete with uppercase
+    pubkey_upper = sample_keystore["pubkey"].upper()
+    resp = await client.request(
+        "DELETE",
+        "/eth/v1/keystores",
+        content=json.dumps({"pubkeys": [pubkey_upper]}),
+    )
+    assert resp.status_code == 200
+
+    data = resp.json()
+    assert data["data"][0]["status"] == "deleted"
+
+
+@pytest.mark.asyncio
+async def test_import_keystore_invalid_crypto_structure(
+    client: AsyncTestClient,
+) -> None:
+    """Test importing a keystore with invalid crypto structure."""
+    invalid_keystore = {
+        "version": 4,
+        "pubkey": "a" * 96,
+        "path": "m/12381/3600/0/0/0",
+        "uuid": "test-uuid",
+        "crypto": {
+            "kdf": {"function": "scrypt", "params": {}, "message": ""},
+            # Missing checksum and cipher
+        },
+    }
+    keystore_json = json.dumps(invalid_keystore)
+
+    resp = await client.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": ["password"]},
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
+
+    data = resp.json()
+    assert "data" in data
+    assert len(data["data"]) == 1
+    assert data["data"][0]["status"] == "error"
+
+
+@pytest.mark.asyncio
+async def test_healthcheck_endpoint(client: AsyncTestClient) -> None:
+    """Test the Web3Signer-compatible healthcheck endpoint."""
+    resp = await client.get("/healthcheck")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
+
+    data = resp.json()
+    assert "status" in data
+    assert "outcome" in data
+    assert data["status"] == "UP"
+    assert data["outcome"] == "UP"
+
+
+@pytest.mark.asyncio
+async def test_sign_attestation_without_fork_info(
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+) -> None:
+    """Test signing without fork_info fails validation."""
+    # First import a keystore
+    keystore_json = json.dumps(sample_keystore)
+    await client.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
+    )
+    pubkey = sample_keystore["pubkey"]
+
+    # Sign without fork_info
+    resp = await client.post(
+        f"/api/v1/eth2/sign/{pubkey}",
+        json={
+            "type": "ATTESTATION",
+            "signing_root": "0x" + "00" * 32,
+            "attestation": {
+                "slot": "123",
+                "index": "0",
+                "beacon_block_root": "0x" + "00" * 32,
+                "source": {"epoch": "0", "root": "0x" + "00" * 32},
+                "target": {"epoch": "1", "root": "0x" + "00" * 32},
+            },
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.headers["content-type"] == "application/json"
+
+    data = resp.json()
+    assert "detail" in data
+    assert "fork_info" in data["detail"].lower() or "missing" in data["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_sign_with_invalid_signing_root_length(
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+    valid_fork_info: dict[str, Any],
+) -> None:
+    """Test signing with invalid signing_root length fails."""
+    # First import a keystore
+    keystore_json = json.dumps(sample_keystore)
+    await client.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
+    )
+    pubkey = sample_keystore["pubkey"]
+
+    # Sign with wrong signing_root length (16 bytes instead of 32)
+    resp = await client.post(
+        f"/api/v1/eth2/sign/{pubkey}",
+        json={
+            "type": "ATTESTATION",
+            "fork_info": valid_fork_info,
+            "signing_root": "0x" + "00" * 16,  # Only 16 bytes
+            "attestation": {
+                "slot": "123",
+                "index": "0",
+                "beacon_block_root": "0x" + "00" * 32,
+                "source": {"epoch": "0", "root": "0x" + "00" * 32},
+                "target": {"epoch": "1", "root": "0x" + "00" * 32},
+            },
+        },
+    )
+    assert resp.status_code == 400
+    assert resp.headers["content-type"] == "application/json"
+
+    data = resp.json()
+    assert "detail" in data
+    assert "32 bytes" in data["detail"]
+
+
+@pytest.mark.asyncio
+async def test_sign_with_malformed_json(
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+) -> None:
+    """Test signing with malformed JSON fails."""
+    # First import a keystore
+    keystore_json = json.dumps(sample_keystore)
+    await client.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
+    )
+    pubkey = sample_keystore["pubkey"]
+
+    # Send malformed JSON
+    resp = await client.post(
+        f"/api/v1/eth2/sign/{pubkey}",
+        content="not valid json",
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 400
+    assert resp.headers["content-type"] == "application/json"
+
+    data = resp.json()
+    assert "detail" in data
 
 
 @pytest.mark.asyncio
@@ -821,5 +1163,10 @@ async def test_sign_accept_header_text_plain(
     assert resp.headers["content-type"] == "text/plain; charset=utf-8"
 
     data = resp.text
-    assert data.startswith("0x")
-    assert len(data) == 194  # 0x + 96 bytes * 2 = 194
+    assert data.startswith("0x"), f"Expected signature to start with 0x, got {data[:10]}"
+    assert len(data) == 194, f"Expected 194 chars (0x + 96 bytes * 2), got {len(data)}"
+    # Verify it's valid hex
+    try:
+        int(data, 16)
+    except ValueError:
+        pytest.fail(f"Signature is not valid hex: {data}")
