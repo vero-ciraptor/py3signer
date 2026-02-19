@@ -282,30 +282,6 @@ async def test_delete_empty_pubkeys(client: AsyncTestClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_remote_keys_stub(client: AsyncTestClient) -> None:
-    """Test remote keys endpoints return stubs."""
-    resp = await client.get("/eth/v1/remotekeys")
-    assert resp.status_code == 200
-    assert resp.headers["content-type"] == "application/json"
-
-    data = resp.json()
-    assert "data" in data, f"Expected 'data' key in response, got {data}"
-    assert data["data"] == [], f"Expected empty list, got {data['data']}"
-
-    resp = await client.post("/eth/v1/remotekeys")
-    assert resp.status_code == 501
-    assert resp.headers["content-type"] == "application/json"
-    data = resp.json()
-    assert "message" in data or "detail" in data
-
-    resp = await client.delete("/eth/v1/remotekeys")
-    assert resp.status_code == 501
-    assert resp.headers["content-type"] == "application/json"
-    data = resp.json()
-    assert "message" in data or "detail" in data
-
-
-@pytest.mark.asyncio
 async def test_list_public_keys_after_import(
     client: AsyncTestClient,
     sample_keystore: dict[str, Any],

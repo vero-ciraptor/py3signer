@@ -10,7 +10,6 @@ from litestar.exceptions import HTTPException, NotFoundException, ValidationExce
 from litestar.status_codes import (
     HTTP_200_OK,
     HTTP_500_INTERNAL_SERVER_ERROR,
-    HTTP_501_NOT_IMPLEMENTED,
 )
 
 from .keystore import Keystore, KeystoreError
@@ -165,8 +164,8 @@ class HealthController(Controller):  # type: ignore[misc]
         return Web3SignerHealthResponse(status="UP", outcome="UP")
 
 
-class KeystoreController(Controller):  # type: ignore[misc]
-    """Keymanager API keystore endpoints."""
+class LocalKeyManagerController(Controller):  # type: ignore[misc]
+    """Keymanager API - Local Key Manager endpoints."""
 
     path = "/eth/v1/keystores"
 
@@ -207,7 +206,7 @@ class KeystoreController(Controller):  # type: ignore[misc]
 
         # Log if slashing protection data was provided (we accept but don't process it)
         if import_req.slashing_protection:
-            logger.debug(
+            logger.warning(
                 "Slashing protection data provided during import (accepted but not processed)"
             )
 
@@ -344,42 +343,6 @@ class KeystoreController(Controller):  # type: ignore[misc]
         )
 
 
-class RemoteKeysController(Controller):  # type: ignore[misc]
-    """Remote keys endpoints (stub)."""
-
-    path = "/eth/v1/remotekeys"
-
-    @get()  # type: ignore[untyped-decorator]
-    async def list_remote_keys(
-        self,
-        request: Request,  # noqa: ARG002
-    ) -> Response[dict[str, Any]]:
-        """GET /eth/v1/remotekeys - List remote keys (stub)."""
-        return Response(content={"data": []}, status_code=HTTP_200_OK)
-
-    @post()  # type: ignore[untyped-decorator]
-    async def add_remote_keys(
-        self,
-        request: Request,  # noqa: ARG002
-    ) -> Response[dict[str, Any]]:
-        """POST /eth/v1/remotekeys - Add remote keys (stub)."""
-        return Response(
-            content={"data": [], "message": "Remote keys not supported"},
-            status_code=HTTP_501_NOT_IMPLEMENTED,
-        )
-
-    @delete(status_code=HTTP_501_NOT_IMPLEMENTED)  # type: ignore[untyped-decorator]
-    async def delete_remote_keys(
-        self,
-        request: Request,  # noqa: ARG002
-    ) -> Response[dict[str, Any]]:
-        """DELETE /eth/v1/remotekeys - Delete remote keys (stub)."""
-        return Response(
-            content={"data": [], "message": "Remote keys not supported"},
-            status_code=HTTP_501_NOT_IMPLEMENTED,
-        )
-
-
 class SigningController(Controller):  # type: ignore[misc]
     """Remote Signing API endpoints."""
 
@@ -472,7 +435,6 @@ def get_routers() -> list[Router]:
     """Get all routers for the application."""
     return [
         Router(path="/", route_handlers=[HealthController]),
-        Router(path="/", route_handlers=[KeystoreController]),
-        Router(path="/", route_handlers=[RemoteKeysController]),
+        Router(path="/", route_handlers=[LocalKeyManagerController]),
         Router(path="/", route_handlers=[SigningController]),
     ]
