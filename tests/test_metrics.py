@@ -77,7 +77,7 @@ async def test_keys_loaded_gauge(metrics_client: AsyncTestClient) -> None:
     assert "keys_loaded 3.0" in text
 
     # Remove a key
-    pk_hex = list(storage._keys.keys())[0]
+    pk_hex = next(iter(storage._keys.keys()))
     storage.remove_key(pk_hex)
 
     # Check gauge updated

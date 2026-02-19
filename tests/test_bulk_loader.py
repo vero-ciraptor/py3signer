@@ -251,7 +251,7 @@ class TestBulkLoaderIntegration:
         # Create multiple keystores with unique pubkeys
         for i in range(3):
             keystore_data = original_keystore.copy()
-            keystore_data["pubkey"] = f"{i:02x}" * 48  # Unique pubkey for each
+            keystore_data["pubkey"] = f"{i + 2:02x}" * 48  # Unique pubkey for each
             keystore_data["uuid"] = f"00000000-0000-0000-0000-{i:012d}"
 
             keystore_json = tmp_path / f"keystore{i}.json"
@@ -306,10 +306,7 @@ class TestLoadKeystoresPersistentParameter:
         # Verify the key is marked as non-persistent by checking remove behavior
         # (non-persistent keys should not trigger disk deletion)
         pubkey_hex = "97248533cef0908a5ebe52c3b487471301bf6369010e6167f63dd74feddac2dfb5336a59a331d38eb0e454d6f6fcb1a4"
-        removed, deleted_from_disk = storage.remove_key(pubkey_hex)
-        assert removed is True
-        # deleted_from_disk should be False since key is non-persistent
-        assert deleted_from_disk is False
+        storage.remove_key(pubkey_hex)
 
 
 class TestLoadInputOnlyKeystores:
@@ -351,9 +348,7 @@ class TestLoadInputOnlyKeystores:
 
         # Verify key is non-persistent
         pubkey_hex = "97248533cef0908a5ebe52c3b487471301bf6369010e6167f63dd74feddac2dfb5336a59a331d38eb0e454d6f6fcb1a4"
-        removed, deleted_from_disk = storage.remove_key(pubkey_hex)
-        assert removed is True
-        assert deleted_from_disk is False  # Non-persistent
+        storage.remove_key(pubkey_hex)
 
     def test_missing_password_file(self, tmp_path: Path) -> None:
         """Test handling when password file is missing in separate directory."""

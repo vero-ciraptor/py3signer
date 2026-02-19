@@ -42,9 +42,8 @@ class TestCryptoCore:
 
     def test_secret_key_invalid_length(self) -> None:
         """Test secret key with wrong length."""
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(ValueError, match="SecretKey must be 32 bytes, got 5"):
             SecretKey.from_bytes(b"short")
-        assert "32 bytes" in str(exc_info.value) or "Invalid" in str(exc_info.value)
 
     def test_public_key_from_secret(self) -> None:
         """Test deriving public key from secret key."""

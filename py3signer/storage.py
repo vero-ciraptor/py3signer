@@ -3,6 +3,7 @@
 import logging
 import os
 import tempfile
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,6 +23,10 @@ class KeyPair:
     path: str
     description: str | None = None
     persistent: bool = True  # Whether this key should be persisted to disk
+
+
+class KeyNotFound(Exception):
+    pass
 
 
 class KeyStorage:
@@ -66,7 +71,7 @@ class KeyStorage:
                 delete=False,
             ) as f:
                 f.write(keystore_json)
-                keystore_temp = f.name
+                keystore_temp = Path(f.name)
 
             with tempfile.NamedTemporaryFile(
                 mode="w",
@@ -75,7 +80,7 @@ class KeyStorage:
                 delete=False,
             ) as f:
                 f.write(password)
-                password_temp = f.name
+                password_temp = Path(f.name)
 
             os.rename(keystore_temp, keystore_file)
             os.rename(password_temp, password_file)
@@ -84,14 +89,12 @@ class KeyStorage:
             return True
 
         except Exception as e:
-            logger.warning(f"Failed to save keystore to disk: {e}")
+            logger.exception(f"Failed to save keystore to disk: {e!r}")
             # Cleanup temp files
             for temp in (keystore_temp, password_temp):
                 if temp:
-                    try:
-                        os.unlink(temp)
-                    except OSError:
-                        pass
+                    with suppress(OSError):
+                        temp.unlink()
             return False
 
     def _delete_from_disk(self, pubkey_hex: str) -> bool:
@@ -106,11 +109,11 @@ class KeyStorage:
                 if file_path.exists():
                     file_path.unlink()
                     logger.info(f"Deleted from disk: {file_path.name}")
-
-            return True
         except Exception as e:
             logger.warning(f"Failed to delete keystore from disk: {e}")
             return False
+        else:
+            return True
 
     def add_key(
         self,
@@ -171,15 +174,10 @@ class KeyStorage:
         """List all stored keys as (pubkey_hex, path, description) tuples."""
         return [(h, k.path, k.description) for h, k in self._keys.items()]
 
-    def remove_key(self, pubkey_hex: str) -> tuple[bool, bool]:
-        """Remove a key from storage. Optionally deletes from disk if keystore_path is set.
-
-        Returns:
-            Tuple of (removed_from_memory, deleted_from_disk).
-
-        """
+    def remove_key(self, pubkey_hex: str) -> None:
+        """Remove a key from storage. Also deletes from disk if keystore_path is set."""
         if pubkey_hex not in self._keys:
-            return False, False
+            raise KeyNotFound
 
         key_pair = self._keys[pubkey_hex]
         is_persistent = key_pair.persistent
@@ -188,11 +186,8 @@ class KeyStorage:
         KEYS_LOADED.set(len(self._keys))
         logger.info(f"Removed key: {pubkey_hex[:20]}...")
 
-        deleted_from_disk = False
         if is_persistent and self._keystore_path is not None:
-            deleted_from_disk = self._delete_from_disk(pubkey_hex)
-
-        return True, deleted_from_disk
+            self._delete_from_disk(pubkey_hex)
 
     def get_secret_key(self, pubkey_hex: str) -> SecretKey | None:
         """Get the secret key for a given public key."""

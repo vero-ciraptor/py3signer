@@ -127,5 +127,5 @@ class Keystore(msgspec.Struct):
                 or "password" in error_msg
                 or "invalid" in error_msg
             ):
-                raise KeystoreError("Invalid password")
-            raise KeystoreError(f"Decryption failed: {e}")
+                raise KeystoreError("Invalid password") from e
+            raise KeystoreError(f"Decryption failed: {e}") from e

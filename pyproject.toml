@@ -42,10 +42,10 @@ addopts = ["-v", "--tb=short"]
 select = [
     "ALL",
 ]
-ignore = ["BLE001", "EM", "G004"]
+ignore = ["D", "EM", "FIX", "PL", "TD", "ANN204", "ANN401", "C408", "C901", "COM812", "ERA001", "E501", "FBT", "G004", "ISC001", "N805", "N812", "N818", "TRY003", "TRY400", "TRY401", "BLE001"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S", "ERA001", "E501", "PLR", "INP"]
+"tests/*" = ["S", "ERA001", "E501", "PLR", "INP", "SLF"]
 "rust/*.pyi" = ["PYI021"]
 
 [tool.mypy]

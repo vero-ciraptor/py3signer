@@ -427,7 +427,7 @@ class TestAllSigningTypes:
     """Test that all signing type discriminators work."""
 
     @pytest.mark.parametrize(
-        "type_name,expected_class",
+        ("type_name", "expected_class"),
         [
             ("AGGREGATION_SLOT", AggregationSlotSignRequest),
             ("AGGREGATE_AND_PROOF", AggregateAndProofSignRequest),

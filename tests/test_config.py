@@ -10,7 +10,7 @@ from py3signer.config import Config
 class TestKeystoresPathConfig:
     """Tests for --keystores-path and --keystores-passwords-path configuration."""
 
-    def test_both_paths_none(self, tmp_path: Path) -> None:
+    def test_both_paths_none(self) -> None:
         """Test that both paths can be None (default)."""
         config = Config()
         assert config.keystores_path is None

@@ -1,6 +1,7 @@
 """HTTP route handlers for Keymanager API with Litestar."""
 
 import logging
+from enum import Enum
 from typing import Any
 
 import msgspec
@@ -21,7 +22,7 @@ from .signing_types import (
     sign_request_decoder,
     validate_signing_root,
 )
-from .storage import KeyStorage
+from .storage import KeyNotFound, KeyStorage
 
 logger = logging.getLogger(__name__)
 
@@ -59,11 +60,25 @@ class KeystoreImportResult(msgspec.Struct):
     message: str
 
 
+class KeystoreDeleteStatus(Enum):
+    # key was active and removed
+    DELETED = "deleted"
+    # slashing protection data returned but key was not active
+    NOT_ACTIVE = "not_active"
+    # key was not found to be removed, and no slashing data can be returned
+    NOT_FOUND = "not_found"
+    # unexpected condition meant the key could not be removed
+    # (the key was actually found, but we couldn't stop using it)
+    # - this would be a sign that making it active elsewhere would
+    # almost certainly cause you headaches / slashing conditions etc.
+    ERROR = "error"
+
+
 class KeystoreDeleteResult(msgspec.Struct):
     """Result of deleting a keystore."""
 
-    status: str
-    message: str
+    status: KeystoreDeleteStatus
+    message: str = ""
 
 
 class KeystoreInfo(msgspec.Struct):
@@ -270,26 +285,22 @@ class KeystoreController(Controller):  # type: ignore[misc]
 
         for pubkey_hex in delete_req.pubkeys:
             pubkey_hex_clean = pubkey_hex.lower().replace("0x", "")
-            removed, deleted = storage.remove_key(pubkey_hex_clean)
-
-            if removed and storage.keystore_path is not None and not deleted:
-                logger.warning(
-                    f"Failed to delete keystore files from disk: {pubkey_hex_clean[:20]}...",
+            try:
+                storage.remove_key(pubkey_hex_clean)
+            except KeyNotFound:
+                results.append(
+                    KeystoreDeleteResult(status=KeystoreDeleteStatus.NOT_FOUND)
                 )
-
-            if removed:
+            except Exception as e:
+                error = str(e)
                 results.append(
                     KeystoreDeleteResult(
-                        status="deleted",
-                        message=f"Successfully deleted keystore with pubkey {pubkey_hex}",
-                    ),
+                        status=KeystoreDeleteStatus.ERROR, message=error
+                    )
                 )
             else:
                 results.append(
-                    KeystoreDeleteResult(
-                        status="not_found",
-                        message=f"Keystore not found for pubkey {pubkey_hex}",
-                    ),
+                    KeystoreDeleteResult(status=KeystoreDeleteStatus.DELETED)
                 )
 
         return Response(

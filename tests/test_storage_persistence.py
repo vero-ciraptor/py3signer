@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from py3signer.storage import KeyStorage
+from py3signer.storage import KeyNotFound, KeyStorage
 
 
 @pytest.fixture
@@ -53,9 +53,9 @@ class TestStoragePersistence:
         assert (temp_keystore_dir / f"{pubkey_hex_str}.txt").exists()
 
         # Verify content
-        with open(temp_keystore_dir / f"{pubkey_hex_str}.json") as f:
+        with (temp_keystore_dir / f"{pubkey_hex_str}.json").open() as f:
             assert f.read() == keystore_json
-        with open(temp_keystore_dir / f"{pubkey_hex_str}.txt") as f:
+        with (temp_keystore_dir / f"{pubkey_hex_str}.txt").open() as f:
             assert f.read() == password
 
     def test_add_key_without_persistence(self) -> None:
@@ -108,10 +108,7 @@ class TestStoragePersistence:
             password="pass",
         )
 
-        removed, deleted = storage.remove_key(pubkey_hex)
-
-        assert removed is True
-        assert deleted is True
+        storage.remove_key(pubkey_hex)
         assert not (temp_keystore_dir / f"{pubkey_hex}.json").exists()
         assert not (temp_keystore_dir / f"{pubkey_hex}.txt").exists()
 
@@ -120,10 +117,8 @@ class TestStoragePersistence:
         storage = KeyStorage(keystore_path=temp_keystore_dir)
         pubkey_hex = "nonexistent" * 6
 
-        removed, deleted = storage.remove_key(pubkey_hex)
-
-        assert removed is False
-        assert deleted is False
+        with pytest.raises(KeyNotFound):
+            storage.remove_key(pubkey_hex)
 
     def test_remove_key_without_persistence(self) -> None:
         """Test removing a key without persistence."""
@@ -136,10 +131,7 @@ class TestStoragePersistence:
         # Add key without persistence
         storage.add_key(pubkey=pubkey, secret_key=secret_key)
 
-        removed, deleted = storage.remove_key(pubkey_hex)
-
-        assert removed is True
-        assert deleted is False  # No disk deletion since no keystore_path
+        storage.remove_key(pubkey_hex)
 
     def test_atomic_write(self, temp_keystore_dir: Path) -> None:
         """Test that keystore writes are atomic (temp file + rename)."""
@@ -209,9 +201,9 @@ class TestStoragePersistence:
         )
 
         # Verify overwritten content
-        with open(temp_keystore_dir / f"{pubkey_hex}.json") as f:
+        with (temp_keystore_dir / f"{pubkey_hex}.json").open() as f:
             assert '"version": 5' in f.read()
-        with open(temp_keystore_dir / f"{pubkey_hex}.txt") as f:
+        with (temp_keystore_dir / f"{pubkey_hex}.txt").open() as f:
             assert f.read() == "password2"
 
     def test_add_key_duplicate_raises(self) -> None:

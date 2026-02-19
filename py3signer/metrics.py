@@ -174,10 +174,7 @@ class MetricsServer:
         self._running = False
         if self._server:
             # Close the server socket to wake up the thread
-            try:
-                self._server.server_close()
-            except Exception:
-                pass
+            self._server.server_close()
             self._server = None
         if self._thread:
             self._thread.join(timeout=2)
