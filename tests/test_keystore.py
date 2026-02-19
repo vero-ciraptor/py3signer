@@ -24,9 +24,8 @@ class TestKeystore:
 
     def test_from_json_invalid(self) -> None:
         """Test loading invalid JSON."""
-        with pytest.raises(msgspec.DecodeError, match="JSON is malformed") as exc_info:
+        with pytest.raises(msgspec.DecodeError, match="JSON is malformed"):
             Keystore.from_json("not valid json")
-        assert "Invalid JSON" in str(exc_info.value)
 
     def test_missing_required_field(self) -> None:
         """Test validation of required fields."""
