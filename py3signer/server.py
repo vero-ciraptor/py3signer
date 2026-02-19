@@ -93,6 +93,9 @@ async def run_server(config: Config) -> None:
     ssl_key = str(config.tls_key) if config.tls_key else None
     ssl_cert = str(config.tls_cert) if config.tls_cert else None
     
+    # Map py3signer log levels to Granian log levels
+    granian_log_level = config.log_level.lower()
+    
     server = Granian(
         target="py3signer.asgi:app",
         address=config.host,
@@ -101,6 +104,7 @@ async def run_server(config: Config) -> None:
         workers=workers,
         ssl_key=ssl_key,
         ssl_cert=ssl_cert,
+        log_level=granian_log_level,
     )
 
     # Start metrics server in the main process (not workers)
