@@ -271,14 +271,6 @@ cargo test
 
 ### Integration Tests
 
-```bash
-# Start server in one terminal
-uv run python -m py3signer --log-level DEBUG
-
-# In another terminal, run test script
-./examples/test_api.sh
-```
-
 ## Benchmarking
 
 A benchmark script is included to measure signature throughput on the `/api/v1/eth2/sign/{identifier}` endpoint.

@@ -57,4 +57,3 @@ Thumbs.db
 *.pem
 *.key
 keystore*.json
-!examples/sample_keystore.json
