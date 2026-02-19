@@ -34,13 +34,13 @@ class TestStoragePersistence:
         """Test that storage works without a data_dir (in-memory only)."""
         storage = KeyStorage()
         assert storage.data_dir is None
-        assert storage.keystore_path is None
+        assert storage.managed_keystores_dir is None
 
     def test_storage_with_data_dir(self, temp_data_dir: Path) -> None:
         """Test that storage accepts a data_dir and creates keystores subdirectory."""
         storage = KeyStorage(data_dir=temp_data_dir)
         assert storage.data_dir == temp_data_dir
-        assert storage.keystore_path == temp_data_dir / "keystores"
+        assert storage.managed_keystores_dir == temp_data_dir / "keystores"
 
     def test_storage_with_external_path(self, tmp_path: Path) -> None:
         """Test that storage accepts an external keystores path."""
@@ -378,64 +378,6 @@ class TestStoragePersistence:
         assert not storage.is_managed_key(ext_pubkey_hex)
         assert storage.is_managed_key(mng_pubkey_hex)
         assert not storage.is_external_key(mng_pubkey_hex)
-
-
-class TestKeystoreImport:
-    """Test importing keystore files from external sources."""
-
-    def test_import_keystore_files(self, tmp_path: Path) -> None:
-        """Test importing keystore files from external directory (deprecated)."""
-        # Create data_dir for storage
-        data_dir = tmp_path / "data"
-        data_dir.mkdir()
-        storage = KeyStorage(data_dir=data_dir)
-
-        # Create source directory with keystore files
-        source_dir = tmp_path / "source"
-        source_dir.mkdir()
-        pubkey_hex = "aabbccdd" * 12
-
-        # Create source files
-        (source_dir / f"{pubkey_hex}.json").write_text('{"version": 4}')
-        (source_dir / f"{pubkey_hex}.txt").write_text("testpassword")
-
-        # Import files (deprecated method)
-        result = storage.import_keystore_files(source_dir, pubkey_hex)
-
-        # Verify files were copied
-        keystores_dir = data_dir / "keystores"
-        assert result == (
-            keystores_dir / f"{pubkey_hex}.json",
-            keystores_dir / f"{pubkey_hex}.txt",
-        )
-        assert (keystores_dir / f"{pubkey_hex}.json").exists()
-        assert (keystores_dir / f"{pubkey_hex}.txt").exists()
-        assert (keystores_dir / f"{pubkey_hex}.json").read_text() == '{"version": 4}'
-        assert (keystores_dir / f"{pubkey_hex}.txt").read_text() == "testpassword"
-
-    def test_import_keystore_files_no_data_dir(self, tmp_path: Path) -> None:
-        """Test importing when no data_dir is configured."""
-        storage = KeyStorage()  # No data_dir
-        source_dir = tmp_path / "source"
-        source_dir.mkdir()
-        pubkey_hex = "aabbccdd" * 12
-
-        result = storage.import_keystore_files(source_dir, pubkey_hex)
-        assert result == (None, None)
-
-    def test_import_keystore_files_missing_source(self, tmp_path: Path) -> None:
-        """Test importing when source files don't exist."""
-        data_dir = tmp_path / "data"
-        data_dir.mkdir()
-        storage = KeyStorage(data_dir=data_dir)
-
-        source_dir = tmp_path / "source"
-        source_dir.mkdir()
-        pubkey_hex = "aabbccdd" * 12
-
-        # Don't create any files
-        result = storage.import_keystore_files(source_dir, pubkey_hex)
-        assert result == (None, None)
 
 
 class TestKeyDeletion:

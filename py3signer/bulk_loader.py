@@ -133,31 +133,20 @@ def load_keystore_with_password(
 def load_keystores_from_directory(
     directory: Path,
     storage: KeyStorage,
-    import_to_storage: bool = False,
 ) -> tuple[int, int]:
     """Load all keystores from a directory into storage.
 
     Each .json keystore file must have a matching .txt file with the same base name
-    containing the plaintext password.
-
-    DEPRECATED: Use load_external_keystores instead for external keystores.
-    This function is kept for backward compatibility.
+    containing the plaintext password. Keys are loaded as managed keys.
 
     Args:
         directory: Path to directory containing keystore files
         storage: KeyStorage instance to load keys into
-        import_to_storage: If True, copy keystore files to storage's keystores dir
-            DEPRECATED: External keys should NOT be copied.
 
     Returns:
         Tuple of (success_count, failure_count)
 
     """
-    if import_to_storage:
-        logger.warning(
-            "import_to_storage=True is deprecated - external keys should NOT be copied"
-        )
-
     keystores = scan_keystore_directory(directory)
 
     success_count = 0
@@ -174,27 +163,18 @@ def load_keystores_from_directory(
                 )
             )
 
-            if import_to_storage:
-                # Read keystore JSON for persistence to managed storage
-                keystore_json = keystore_path.read_text()
+            # Read keystore JSON for persistence to managed storage
+            keystore_json = keystore_path.read_text()
 
-                # Add key to managed storage
-                storage.add_key(
-                    pubkey,
-                    secret_key,
-                    path,
-                    description,
-                    keystore_json=keystore_json,
-                    password=password,
-                )
-            else:
-                # Add as external key (not copied)
-                storage.add_external_key(
-                    pubkey,
-                    secret_key,
-                    path,
-                    description,
-                )
+            # Add key to managed storage
+            storage.add_key(
+                pubkey,
+                secret_key,
+                path,
+                description,
+                keystore_json=keystore_json,
+                password=password,
+            )
 
             logger.info(f"Loaded keystore: {base_name}")
             success_count += 1
@@ -282,145 +262,5 @@ def load_external_keystores(
 
     logger.info(
         f"External keystore loading complete: {success_count} succeeded, {failure_count} failed",
-    )
-    return success_count, failure_count
-
-
-def import_keystores_from_directory(
-    source_dir: Path,
-    storage: KeyStorage,
-) -> tuple[int, int]:
-    """Import keystores from a source directory into managed storage.
-
-    This function loads keystores from a source directory and copies them
-    to the managed storage location (data_dir/keystores).
-
-    DEPRECATED: This function is kept for backward compatibility.
-    For external keystores, use load_external_keystores instead.
-    For importing via API, use the API endpoint.
-
-    Args:
-        source_dir: Path to directory containing keystore .json and .txt files
-        storage: KeyStorage instance to load keys into
-
-    Returns:
-        Tuple of (success_count, failure_count)
-
-    Raises:
-        ValueError: If source_dir is not a valid directory
-
-    """
-    logger.warning(
-        "import_keystores_from_directory is deprecated - "
-        "use load_external_keystores for external keys or API for imports"
-    )
-
-    if not source_dir.exists():
-        raise ValueError(f"Source directory does not exist: {source_dir}")
-    if not source_dir.is_dir():
-        raise ValueError(f"Source path is not a directory: {source_dir}")
-
-    # Use the unified loading function with import enabled
-    return load_keystores_from_directory(source_dir, storage, import_to_storage=True)
-
-
-def import_keystores_from_separate_directories(
-    keystores_path: Path,
-    passwords_path: Path,
-    storage: KeyStorage,
-) -> tuple[int, int]:
-    """Import keystores from separate directories into managed storage.
-
-    Scans the keystores directory for .json files and looks for matching
-    .txt password files in the passwords directory (by base name).
-    Keys are imported (copied) to the managed storage location.
-
-    DEPRECATED: This function is kept for backward compatibility.
-    For external keystores, use load_external_keystores instead which does NOT copy files.
-    For importing via API, use the API endpoint.
-
-    Args:
-        keystores_path: Path to directory containing keystore .json files
-        passwords_path: Path to directory containing password .txt files
-        storage: KeyStorage instance to load keys into
-
-    Returns:
-        Tuple of (success_count, failure_count)
-
-    Raises:
-        ValueError: If either path is not a valid directory
-
-    """
-    logger.warning(
-        "import_keystores_from_separate_directories is deprecated - "
-        "use load_external_keystores for external keys which does NOT copy files"
-    )
-
-    if not keystores_path.exists():
-        raise ValueError(f"Keystores path does not exist: {keystores_path}")
-    if not keystores_path.is_dir():
-        raise ValueError(f"Keystores path is not a directory: {keystores_path}")
-    if not passwords_path.exists():
-        raise ValueError(f"Passwords path does not exist: {passwords_path}")
-    if not passwords_path.is_dir():
-        raise ValueError(f"Passwords path is not a directory: {passwords_path}")
-
-    # Find all .json files in keystores_path
-    success_count = 0
-    failure_count = 0
-
-    for json_file in keystores_path.glob("*.json"):
-        base_name = json_file.stem
-        password_file = passwords_path / f"{base_name}.txt"
-
-        if not password_file.exists():
-            logger.warning(
-                f"Skipping {json_file.name}: no matching password file in {passwords_path}",
-            )
-            failure_count += 1
-            continue
-
-        try:
-            pubkey, secret_key, path, description, password = (
-                load_keystore_with_password(
-                    json_file,
-                    password_file,
-                )
-            )
-            pubkey_hex = pubkey.to_bytes().hex()
-
-            # Read keystore JSON for persistence
-            keystore_json = json_file.read_text()
-
-            # Add key to managed storage (this is the deprecated behavior - copying)
-            storage.add_key(
-                pubkey,
-                secret_key,
-                path,
-                description,
-                keystore_json=keystore_json,
-                password=password,
-            )
-
-            # Also import the keystore files to managed storage (copy them)
-            result = storage.import_keystore_files(keystores_path, pubkey_hex)
-            if result == (None, None):
-                # Try passwords_path as fallback (for files named by pubkey)
-                storage.import_keystore_files(passwords_path, pubkey_hex)
-
-            logger.info(f"Imported keystore: {base_name}")
-            success_count += 1
-        except KeystoreError as e:
-            logger.error(f"Failed to import keystore {base_name}: {e}")
-            failure_count += 1
-        except ValueError as e:
-            logger.error(f"Failed to add keystore {base_name} to storage: {e}")
-            failure_count += 1
-        except Exception as e:
-            logger.error(f"Unexpected error importing keystore {base_name}: {e}")
-            failure_count += 1
-
-    logger.info(
-        f"Import complete: {success_count} succeeded, {failure_count} failed",
     )
     return success_count, failure_count

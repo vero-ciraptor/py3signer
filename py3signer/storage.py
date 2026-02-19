@@ -1,7 +1,6 @@
 """In-memory key storage with optional disk persistence."""
 
 import logging
-import shutil
 import tempfile
 from contextlib import suppress
 from dataclasses import dataclass
@@ -76,12 +75,8 @@ class KeyStorage:
         return self._data_dir
 
     @property
-    def keystore_path(self) -> Path | None:
-        """Return the managed keystores directory path if configured.
-
-        Deprecated: Use data_dir property instead. The keystores are always
-        stored in data_dir / "keystores".
-        """
+    def managed_keystores_dir(self) -> Path | None:
+        """Return the managed keystores directory path if configured."""
         return self._managed_keystores_dir
 
     @property
@@ -399,77 +394,3 @@ class KeyStorage:
         self._external_keys.clear()
         self._managed_keys.clear()
         KEYS_LOADED.set(0)
-
-    # Deprecated methods - kept for backward compatibility
-
-    def import_keystore_files(
-        self,
-        source_dir: Path,
-        pubkey_hex: str,
-    ) -> tuple[Path | None, Path | None]:
-        """Import keystore files from a source directory to managed storage.
-
-        DEPRECATED: This method is kept for backward compatibility.
-        External keys should NOT be copied - use add_external_key instead.
-
-        Args:
-            source_dir: Directory containing the source keystore files.
-            pubkey_hex: The public key hex string (base name for files).
-
-        Returns:
-            Tuple of (imported_keystore_path, imported_password_path) or (None, None)
-            if import failed.
-
-        """
-        logger.warning(
-            "import_keystore_files is deprecated - external keys should not be copied"
-        )
-
-        if self._managed_keystores_dir is None:
-            logger.warning("Cannot import keystore: no data_dir configured")
-            return None, None
-
-        source_keystore = source_dir / f"{pubkey_hex}.json"
-        source_password = source_dir / f"{pubkey_hex}.txt"
-
-        if not source_keystore.exists():
-            logger.warning(f"Source keystore not found: {source_keystore}")
-            return None, None
-        if not source_password.exists():
-            logger.warning(f"Source password not found: {source_password}")
-            return None, None
-
-        self.ensure_managed_keystores_dir()
-        dest_keystore = self._managed_keystores_dir / f"{pubkey_hex}.json"
-        dest_password = self._managed_keystores_dir / f"{pubkey_hex}.txt"
-
-        try:
-            shutil.copy2(source_keystore, dest_keystore)
-            shutil.copy2(source_password, dest_password)
-        except Exception as e:
-            logger.error(f"Failed to import keystore files: {e}")
-            return None, None
-        else:
-            logger.info(f"Imported keystore files for {pubkey_hex[:20]}...")
-            return dest_keystore, dest_password
-
-    def _delete_from_disk(self, pubkey_hex: str) -> bool:
-        """Delete keystore and password files from disk (deprecated).
-
-        DEPRECATED: Use remove_key instead which handles both external and managed storage.
-        """
-        logger.warning("_delete_from_disk is deprecated - use remove_key instead")
-
-        # Try external first, then managed
-        external_keystore, _ = self._get_external_file_paths(pubkey_hex)
-        if external_keystore and external_keystore.exists():
-            return self._delete_from_external_storage(pubkey_hex)
-
-        return self._delete_from_managed_storage(pubkey_hex)
-
-    def _get_file_paths(self, pubkey_hex: str) -> tuple[Path, Path]:
-        """Get the file paths for a keystore and its password file (deprecated).
-
-        DEPRECATED: Use _get_managed_file_paths or _get_external_file_paths instead.
-        """
-        return self._get_managed_file_paths(pubkey_hex)
