@@ -414,12 +414,14 @@ class TestValidateSigningRoot:
 
     def test_invalid_length(self) -> None:
         """Test validating a signing root with wrong length fails."""
-        with pytest.raises(ValueError, match="32 bytes"):
+        with pytest.raises(
+            ValueError, match=r"signing_root must be 32 bytes \(64 hex characters\)"
+        ):
             validate_signing_root("0xabcd")
 
     def test_invalid_hex(self) -> None:
         """Test validating non-hex signing root fails."""
-        with pytest.raises(ValueError, match="valid hexadecimal"):
+        with pytest.raises(ValueError, match="signing_root must be valid hexadecimal"):
             validate_signing_root("0x" + "zz" * 32)
 
 

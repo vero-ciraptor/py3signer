@@ -129,7 +129,10 @@ class TestKeystore:
             "version": 3,  # Unsupported version
         }
 
-        with pytest.raises(KeystoreError, match=r"(?i)(version.*not supported|4)"):
+        with pytest.raises(
+            KeystoreError,
+            match=r"Keystore version 3 is not supported, only version 4 \(EIP-2335\) is supported",
+        ):
             Keystore(**keystore_data)
 
 
@@ -202,7 +205,7 @@ class TestKeystoreDecryption:
         keystore_path = Path(__file__).parent / "data" / keystore_file
         ks = Keystore.from_file(keystore_path)
 
-        with pytest.raises(KeystoreError, match=r"(?i)(password|invalid)"):
+        with pytest.raises(KeystoreError, match="Invalid password"):
             ks.decrypt("wrongpassword")
 
 
@@ -214,7 +217,7 @@ class TestKeystoreDecryptionLegacy:
         keystore_json = json.dumps(sample_keystore)
         ks = Keystore.from_json(keystore_json)
 
-        with pytest.raises(KeystoreError, match=r"(?i)(password|invalid)"):
+        with pytest.raises(KeystoreError, match="Invalid password"):
             ks.decrypt("wrongpassword")
 
 
@@ -272,7 +275,7 @@ class TestKeystoreEdgeCases:
         keystore_json = json.dumps(sample_keystore)
         ks = Keystore.from_json(keystore_json)
 
-        with pytest.raises(KeystoreError, match=r"(?i)(password|invalid)"):
+        with pytest.raises(KeystoreError, match="Invalid password"):
             ks.decrypt("")
 
     def test_none_password_not_allowed(self, sample_keystore: dict[str, Any]) -> None:

@@ -39,7 +39,7 @@ class TestKeystoresPathConfig:
 
         with pytest.raises(
             ValueError,
-            match=r".*--keystores-passwords-path must be provided.*",
+            match="--keystores-passwords-path must be provided when --keystores-path is set",
         ):
             Config(keystores_path=keystores_dir, keystores_passwords_path=None)
 
@@ -48,7 +48,10 @@ class TestKeystoresPathConfig:
         passwords_dir = tmp_path / "passwords"
         passwords_dir.mkdir()
 
-        with pytest.raises(ValueError, match=r".*--keystores-path must be provided.*"):
+        with pytest.raises(
+            ValueError,
+            match="--keystores-path must be provided when --keystores-passwords-path is set",
+        ):
             Config(keystores_path=None, keystores_passwords_path=passwords_dir)
 
     def test_keystores_path_not_exists(self, tmp_path: Path) -> None:
@@ -57,7 +60,8 @@ class TestKeystoresPathConfig:
         passwords_dir = tmp_path / "passwords"
         passwords_dir.mkdir()
 
-        with pytest.raises(ValueError, match=r".*keystores_path does not exist.*"):
+        expected_msg = f"keystores_path does not exist: {keystores_dir}"
+        with pytest.raises(ValueError, match=expected_msg):
             Config(
                 keystores_path=keystores_dir,
                 keystores_passwords_path=passwords_dir,
@@ -97,10 +101,8 @@ class TestKeystoresPathConfig:
         keystores_dir.mkdir()
         passwords_file.write_text("not a directory")
 
-        with pytest.raises(
-            ValueError,
-            match=r".*keystores_passwords_path must be a directory.*",
-        ):
+        expected_msg = f"keystores_passwords_path must be a directory: {passwords_file}"
+        with pytest.raises(ValueError, match=expected_msg):
             Config(
                 keystores_path=keystores_dir,
                 keystores_passwords_path=passwords_file,
@@ -128,7 +130,8 @@ class TestKeyStorePathConfig:
         """Test error when key_store_path does not exist."""
         keystore_dir = tmp_path / "keystores"
 
-        with pytest.raises(ValueError, match=r".*key_store_path does not exist.*"):
+        expected_msg = f"key_store_path does not exist: {keystore_dir}"
+        with pytest.raises(ValueError, match=expected_msg):
             Config(key_store_path=keystore_dir)
 
     def test_key_store_path_not_directory(self, tmp_path: Path) -> None:
@@ -136,7 +139,8 @@ class TestKeyStorePathConfig:
         keystore_file = tmp_path / "keystores"
         keystore_file.write_text("not a directory")
 
-        with pytest.raises(ValueError, match=r".*key_store_path must be a directory.*"):
+        expected_msg = f"key_store_path must be a directory: {keystore_file}"
+        with pytest.raises(ValueError, match=expected_msg):
             Config(key_store_path=keystore_file)
 
 
@@ -215,12 +219,14 @@ class TestPortConfig:
 
     def test_port_too_low(self) -> None:
         """Test error when port is too low."""
-        with pytest.raises(ValueError, match=r".*port must be between.*"):
+        with pytest.raises(ValueError, match="port must be between 1 and 65535, got 0"):
             Config(port=0)
 
     def test_port_too_high(self) -> None:
         """Test error when port is too high."""
-        with pytest.raises(ValueError, match=r".*port must be between.*"):
+        with pytest.raises(
+            ValueError, match="port must be between 1 and 65535, got 65536"
+        ):
             Config(port=65536)
 
 
@@ -248,12 +254,16 @@ class TestMetricsPortConfig:
 
     def test_metrics_port_too_low(self) -> None:
         """Test error when metrics port is too low."""
-        with pytest.raises(ValueError, match=r".*metrics_port must be between.*"):
+        with pytest.raises(
+            ValueError, match="metrics_port must be between 1 and 65535, got 0"
+        ):
             Config(metrics_port=0)
 
     def test_metrics_port_too_high(self) -> None:
         """Test error when metrics port is too high."""
-        with pytest.raises(ValueError, match=r".*metrics_port must be between.*"):
+        with pytest.raises(
+            ValueError, match="metrics_port must be between 1 and 65535, got 65536"
+        ):
             Config(metrics_port=65536)
 
     def test_custom_metrics_host(self) -> None:
@@ -288,7 +298,10 @@ class TestLogLevelConfig:
 
     def test_invalid_log_level(self) -> None:
         """Test error when log level is invalid."""
-        with pytest.raises(ValueError, match=r".*log_level must be one of.*"):
+        with pytest.raises(
+            ValueError,
+            match=r"log_level must be one of .* got INVALID",
+        ):
             Config(log_level="INVALID")
 
 
@@ -314,10 +327,10 @@ class TestWorkersConfig:
 
     def test_workers_too_low(self) -> None:
         """Test error when workers is less than 1."""
-        with pytest.raises(ValueError, match=r".*workers must be at least 1.*"):
+        with pytest.raises(ValueError, match="workers must be at least 1, got 0"):
             Config(workers=0)
 
     def test_workers_negative(self) -> None:
         """Test error when workers is negative."""
-        with pytest.raises(ValueError, match=r".*workers must be at least 1.*"):
+        with pytest.raises(ValueError, match="workers must be at least 1, got -1"):
             Config(workers=-1)

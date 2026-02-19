@@ -136,14 +136,14 @@ class TestSigner:
         signer = Signer(storage)
         domain = bytes.fromhex("01000000")  # beacon_attester domain
 
-        with pytest.raises(SignerError, match=r"(?i)not found"):
+        with pytest.raises(SignerError, match="Key not found: nonexistent"):
             signer.sign_data("nonexistent", b"data", domain)
 
     def test_sign_data_invalid_domain_length(self, storage: KeyStorage) -> None:
         """Test signing with invalid domain length."""
         signer = Signer(storage)
 
-        with pytest.raises(SignerError, match=r"(?i)4 bytes"):
+        with pytest.raises(SignerError, match="Domain must be 4 bytes, got 2"):
             signer.sign_data("any", b"data", b"\x00\x00")  # 2 bytes instead of 4
 
     def test_sign_data_success(self, storage: KeyStorage) -> None:

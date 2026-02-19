@@ -212,7 +212,10 @@ class TestCipherSupport:
 
         keystore = Keystore(**keystore_data)
 
-        with pytest.raises(KeystoreError, match=r"(?i)(unsupported|cipher)"):
+        with pytest.raises(
+            KeystoreError,
+            match=r"Decryption failed: Unsupported cipher function: aes-256-gcm\. Only aes-128-ctr and aes-256-ctr are supported\.",
+        ):
             keystore.decrypt(EIP2335_PASSWORD)
 
 
@@ -244,7 +247,7 @@ class TestChecksumVerification:
         """Test that wrong password fails checksum verification."""
         keystore = Keystore(**EIP2335_SCRYPT_KEYSTORE)
 
-        with pytest.raises(KeystoreError, match=r"(?i)password"):
+        with pytest.raises(KeystoreError, match="Invalid password"):
             keystore.decrypt("wrongpassword")
 
     def test_checksum_failure_modified_ciphertext(self) -> None:
@@ -259,7 +262,7 @@ class TestChecksumVerification:
 
         keystore = Keystore(**keystore_data)
 
-        with pytest.raises(KeystoreError, match=r"(?i)(password|checksum)"):
+        with pytest.raises(KeystoreError, match="Invalid password"):
             keystore.decrypt(EIP2335_PASSWORD)
 
 
@@ -272,7 +275,7 @@ class TestEdgeCases:
         # This will fail checksum since original was encrypted with non-empty password
         keystore = Keystore(**EIP2335_SCRYPT_KEYSTORE)
 
-        with pytest.raises(KeystoreError, match=r"(?i)password"):
+        with pytest.raises(KeystoreError, match="Invalid password"):
             keystore.decrypt("")
 
     def test_unicode_password_with_emoji(self) -> None:

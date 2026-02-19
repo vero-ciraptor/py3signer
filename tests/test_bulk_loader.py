@@ -110,7 +110,7 @@ class TestLoadKeystoreWithPassword:
         password_path = tmp_path / "password.txt"
         password_path.write_text("wrongpassword")
 
-        with pytest.raises(KeystoreError, match=r"(?i)(password|invalid)"):
+        with pytest.raises(KeystoreError, match="Invalid password"):
             load_keystore_with_password(keystore_path, password_path)
 
     def test_missing_password_file(self, tmp_path: Path) -> None:
@@ -386,7 +386,8 @@ class TestLoadInputOnlyKeystores:
         passwords_dir.mkdir()
 
         storage = KeyStorage()
-        with pytest.raises(ValueError, match="Keystores path does not exist"):
+        expected_msg = f"Keystores path does not exist: {keystores_dir}"
+        with pytest.raises(ValueError, match=expected_msg):
             load_input_only_keystores(keystores_dir, passwords_dir, storage)
 
     def test_nonexistent_passwords_path(self, tmp_path: Path) -> None:
@@ -396,7 +397,8 @@ class TestLoadInputOnlyKeystores:
         keystores_dir.mkdir()
 
         storage = KeyStorage()
-        with pytest.raises(ValueError, match="Passwords path does not exist"):
+        expected_msg = f"Passwords path does not exist: {passwords_dir}"
+        with pytest.raises(ValueError, match=expected_msg):
             load_input_only_keystores(keystores_dir, passwords_dir, storage)
 
     def test_keystores_path_is_file(self, tmp_path: Path) -> None:
@@ -407,7 +409,8 @@ class TestLoadInputOnlyKeystores:
         passwords_dir.mkdir()
 
         storage = KeyStorage()
-        with pytest.raises(ValueError, match="Keystores path is not a directory"):
+        expected_msg = f"Keystores path is not a directory: {keystores_file}"
+        with pytest.raises(ValueError, match=expected_msg):
             load_input_only_keystores(keystores_file, passwords_dir, storage)
 
     def test_passwords_path_is_file(self, tmp_path: Path) -> None:
@@ -418,7 +421,8 @@ class TestLoadInputOnlyKeystores:
         passwords_file.write_text("not a directory")
 
         storage = KeyStorage()
-        with pytest.raises(ValueError, match="Passwords path is not a directory"):
+        expected_msg = f"Passwords path is not a directory: {passwords_file}"
+        with pytest.raises(ValueError, match=expected_msg):
             load_input_only_keystores(keystores_dir, passwords_file, storage)
 
     def test_multiple_keystores_with_mixed_success(self, tmp_path: Path) -> None:
