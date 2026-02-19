@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import multiprocessing
+import os
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
@@ -14,8 +15,6 @@ from litestar.datastructures import State
 
 from .bulk_loader import load_external_keystores
 from .handlers import get_routers
-from .metrics import MetricsServer
-from .signer import Signer
 from .storage import KeyStorage
 
 if TYPE_CHECKING:
@@ -23,6 +22,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from .config import Config
+    from .signer import Signer
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +95,8 @@ def create_app(
     signer: Signer | None = None,
 ) -> Litestar:
     """Create and configure the Litestar application."""
+    from .signer import Signer
+
     # If config is provided but storage/signer are not, create them
     if config is not None and (storage is None or signer is None):
         storage = KeyStorage(
@@ -173,6 +175,12 @@ async def run_server(config: Config) -> None:
     # Run with Granian ASGI using factory pattern for multi-worker support
     workers = getattr(config, "workers", multiprocessing.cpu_count())
 
+    # Set workers env var BEFORE importing metrics (metrics uses this for multiproc mode)
+    os.environ["PY3SIGNER_WORKERS"] = str(workers)
+
+    # Now import metrics (after setting workers env var)
+    from .metrics import MetricsServer, cleanup_multiproc_dir
+
     # Map py3signer log levels to Granian log levels
     granian_log_level = config.log_level.lower()
 
@@ -184,6 +192,9 @@ async def run_server(config: Config) -> None:
         workers=workers,
         log_level=granian_log_level,
     )
+
+    # Clean up any stale metrics files before starting
+    cleanup_multiproc_dir()
 
     # Start metrics server in the main process (not workers)
     metrics_server = MetricsServer(host=config.metrics_host, port=config.metrics_port)

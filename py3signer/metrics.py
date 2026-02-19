@@ -7,7 +7,10 @@ Metrics are served on a separate port using prometheus_client's built-in HTTP se
 from __future__ import annotations
 
 import logging
+import os
+import tempfile
 import threading
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from litestar import Controller, get
@@ -29,8 +32,74 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Create a dedicated registry for py3signer metrics
-REGISTRY = CollectorRegistry()
+# Multi-process metrics support
+MULTIPROC_DIR: Path | None = None
+
+
+def setup_multiproc_dir() -> None:
+    """Set up Prometheus multi-process metrics directory.
+
+    Must be called BEFORE importing prometheus_client in multi-process mode.
+    This creates a temporary directory that all worker processes use to
+    share metric data via files.
+    """
+    global MULTIPROC_DIR
+
+    # Use existing dir if already set
+    existing = os.environ.get("PROMETHEUS_MULTIPROC_DIR")
+    if existing:
+        MULTIPROC_DIR = Path(existing)
+        return
+
+    # Create a temp directory for multi-process metrics
+    temp_dir = tempfile.mkdtemp(prefix="py3signer_metrics_")
+    MULTIPROC_DIR = Path(temp_dir)
+    os.environ["PROMETHEUS_MULTIPROC_DIR"] = temp_dir
+
+    logger.debug(f"Set up Prometheus multi-process metrics dir: {temp_dir}")
+
+
+def cleanup_multiproc_dir() -> None:
+    """Remove stale metrics files from multi-process directory.
+
+    Should be called on startup in the main process before starting workers.
+    """
+    global MULTIPROC_DIR
+
+    multiproc_dir = MULTIPROC_DIR or os.environ.get("PROMETHEUS_MULTIPROC_DIR")
+    if not multiproc_dir:
+        return
+
+    multiproc_path = Path(multiproc_dir)
+    if not multiproc_path.exists():
+        return
+
+    # Remove all gauge files (they contain pid-specific data)
+    for gauge_file in multiproc_path.glob("gauge_*.db"):
+        try:
+            gauge_file.unlink()
+            logger.debug(f"Removed stale gauge file: {gauge_file}")
+        except OSError:
+            pass
+
+    logger.info(f"Cleaned up Prometheus multi-process metrics dir: {multiproc_dir}")
+
+
+# Check if we're in multi-process mode (workers > 1)
+_workers_env = os.environ.get("PY3SIGNER_WORKERS", "1")
+_is_multiprocess = int(_workers_env) > 1
+
+# Create registry - use MultiProcessCollector if in multi-process mode
+if _is_multiprocess:
+    from prometheus_client import multiprocess
+
+    REGISTRY = CollectorRegistry()
+    setup_multiproc_dir()
+    cleanup_multiproc_dir()
+    multiprocess.MultiProcessCollector(REGISTRY)  # type: ignore[no-untyped-call]
+    logger.info("Enabled Prometheus multi-process metrics mode")
+else:
+    REGISTRY = CollectorRegistry()
 
 # Application info
 APP_INFO = Info(
@@ -64,10 +133,12 @@ SIGNING_ERRORS_TOTAL = Counter(
 )
 
 # Key metrics
+# Use 'max' mode since all workers load the same keys - max gives the correct count
 KEYS_LOADED = Gauge(
     "keys_loaded",
     "Number of keys currently loaded",
     registry=REGISTRY,
+    multiprocess_mode="max",
 )
 
 # HTTP metrics
