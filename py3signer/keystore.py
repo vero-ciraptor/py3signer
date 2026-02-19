@@ -2,11 +2,13 @@
 
 import logging
 import unicodedata
-from pathlib import Path
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import msgspec
 from py3signer_core import SecretKey, decrypt_keystore
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 logger = logging.getLogger(__name__)
 

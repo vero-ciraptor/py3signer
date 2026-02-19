@@ -1,10 +1,13 @@
 """Tests for configuration management."""
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from py3signer.config import Config
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestKeystoresPathConfig:

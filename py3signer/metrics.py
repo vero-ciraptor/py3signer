@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from http.server import HTTPServer
+from typing import TYPE_CHECKING
 
 from litestar import Controller, get
 from litestar.response import Response
@@ -20,6 +20,9 @@ from prometheus_client import (
     Info,
     generate_latest,
 )
+
+if TYPE_CHECKING:
+    from http.server import HTTPServer
 
 logger = logging.getLogger(__name__)
 

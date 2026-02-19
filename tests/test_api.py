@@ -1,13 +1,15 @@
 """Tests for API endpoints."""
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
-from litestar.testing import AsyncTestClient
 
 from py3signer.config import Config
 from py3signer.server import create_app
+
+if TYPE_CHECKING:
+    from litestar.testing import AsyncTestClient
 
 
 # Valid fork info fixture for tests

@@ -2,6 +2,7 @@
 
 import logging
 import time
+from typing import TYPE_CHECKING
 
 from py3signer_core import Signature, sign
 
@@ -10,7 +11,9 @@ from .metrics import (
     SIGNING_ERRORS_TOTAL,
     SIGNING_REQUESTS_TOTAL,
 )
-from .storage import KeyStorage
+
+if TYPE_CHECKING:
+    from .storage import KeyStorage
 
 logger = logging.getLogger(__name__)
 

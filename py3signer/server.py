@@ -2,8 +2,8 @@
 
 import logging
 import multiprocessing
-from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING
 
 from granian import Granian
 from granian.constants import Interfaces
@@ -11,10 +11,14 @@ from litestar import Litestar
 from litestar.datastructures import State
 
 from .bulk_loader import load_input_only_keystores, load_keystores_from_directory
-from .config import Config
 from .handlers import get_routers
 from .signer import Signer
 from .storage import KeyStorage
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
+
+    from .config import Config
 
 logger = logging.getLogger(__name__)
 

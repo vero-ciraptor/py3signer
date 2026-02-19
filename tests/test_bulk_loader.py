@@ -265,7 +265,7 @@ class TestBulkLoaderIntegration:
 
         # This will fail to decrypt but that's expected - we're testing the flow
         storage = KeyStorage()
-        success, failures = load_keystores_from_directory(tmp_path, storage)
+        _success, failures = load_keystores_from_directory(tmp_path, storage)
 
         # TODO there is some weirdness here
         assert failures == 3

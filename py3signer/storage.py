@@ -5,10 +5,12 @@ import tempfile
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
-
-from py3signer_core import PublicKey, SecretKey
+from typing import TYPE_CHECKING
 
 from .metrics import KEYS_LOADED
+
+if TYPE_CHECKING:
+    from py3signer_core import PublicKey, SecretKey
 
 logger = logging.getLogger(__name__)
 

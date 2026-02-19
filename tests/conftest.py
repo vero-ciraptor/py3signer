@@ -1,9 +1,8 @@
 """Test fixtures and utilities."""
 
 import json
-from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from litestar.testing import AsyncTestClient
@@ -11,6 +10,9 @@ from litestar.testing import AsyncTestClient
 from py3signer.config import Config
 from py3signer.server import create_app
 from py3signer.storage import KeyStorage
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Generator
 
 
 @pytest.fixture

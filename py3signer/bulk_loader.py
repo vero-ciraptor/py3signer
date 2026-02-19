@@ -1,12 +1,16 @@
 """Bulk keystore loading from directory."""
 
 import logging
-from pathlib import Path
-
-from py3signer_core import PublicKey, SecretKey
+from typing import TYPE_CHECKING
 
 from .keystore import Keystore, KeystoreError
-from .storage import KeyStorage
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from py3signer_core import PublicKey, SecretKey
+
+    from .storage import KeyStorage
 
 logger = logging.getLogger(__name__)
 

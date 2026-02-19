@@ -1,5 +1,7 @@
 """Tests for signing operations."""
 
+from typing import TYPE_CHECKING
+
 import pytest
 from py3signer_core import (
     PublicKey,
@@ -11,7 +13,9 @@ from py3signer_core import (
 )
 
 from py3signer.signer import Signer, SignerError
-from py3signer.storage import KeyStorage
+
+if TYPE_CHECKING:
+    from py3signer.storage import KeyStorage
 
 
 class TestCryptoCore:

@@ -7,15 +7,18 @@ Configuration is loaded from environment variables set by the main process.
 import json
 import logging
 import os
-from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import msgspec
-from litestar import Litestar
 
 from .config import Config
 from .server import create_app
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from litestar import Litestar
 
 logger = logging.getLogger(__name__)
 

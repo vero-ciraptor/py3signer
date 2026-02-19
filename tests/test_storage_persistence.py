@@ -1,11 +1,14 @@
 """Tests for keystore storage persistence."""
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import MagicMock
 
 import pytest
 
 from py3signer.storage import KeyNotFound, KeyStorage
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 @pytest.fixture

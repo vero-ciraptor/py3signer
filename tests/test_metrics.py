@@ -1,6 +1,6 @@
 """Tests for Prometheus metrics functionality."""
 
-from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 
 import pytest
 from litestar import Litestar
@@ -9,6 +9,9 @@ from litestar.testing import AsyncTestClient
 from py3signer import metrics
 from py3signer.metrics import MetricsController
 from py3signer.storage import KeyStorage
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 
 @pytest.fixture
