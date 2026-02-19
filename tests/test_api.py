@@ -516,6 +516,7 @@ async def test_sign_attestation(
     # Sign an attestation
     resp = await client.post(
         f"/api/v1/eth2/sign/{pubkey}",
+        headers={"Accept": "text/plain"},
         json={
             "type": "ATTESTATION",
             "fork_info": valid_fork_info,
@@ -557,6 +558,7 @@ async def test_sign_randao(
     # Sign a RANDAO reveal
     resp = await client.post(
         f"/api/v1/eth2/sign/{pubkey}",
+        headers={"Accept": "text/plain"},
         json={
             "type": "RANDAO_REVEAL",
             "fork_info": valid_fork_info,
@@ -592,6 +594,7 @@ async def test_sign_voluntary_exit(
     # Sign a voluntary exit
     resp = await client.post(
         f"/api/v1/eth2/sign/{pubkey}",
+        headers={"Accept": "text/plain"},
         json={
             "type": "VOLUNTARY_EXIT",
             "fork_info": valid_fork_info,
@@ -627,6 +630,7 @@ async def test_sign_block_v2(
     # Sign a block v2
     resp = await client.post(
         f"/api/v1/eth2/sign/{pubkey}",
+        headers={"Accept": "text/plain"},
         json={
             "type": "BLOCK_V2",
             "fork_info": valid_fork_info,
@@ -676,9 +680,10 @@ async def test_full_flow(
     assert len(data["data"]) == 1
     pubkey = data["data"][0]["validating_pubkey"]
 
-    # 3. Sign with spec-compliant format
+    # 3. Sign with spec-compliant format (expects text/plain)
     resp = await client.post(
         f"/api/v1/eth2/sign/{pubkey}",
+        headers={"Accept": "text/plain"},
         json={
             "type": "ATTESTATION",
             "fork_info": valid_fork_info,
@@ -713,3 +718,147 @@ async def test_full_flow(
     assert resp.status_code == 200
     data = resp.json()
     assert len(data["data"]) == 0
+
+
+@pytest.mark.asyncio
+async def test_sign_accept_header_json(
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+    valid_fork_info: dict[str, Any],
+) -> None:
+    """Test that Accept: application/json returns JSON response."""
+    # Import a keystore
+    keystore_json = json.dumps(sample_keystore)
+    resp = await client.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
+    )
+    assert resp.status_code == 200
+    pubkey = sample_keystore["pubkey"]
+
+    # Sign with Accept: application/json
+    resp = await client.post(
+        f"/api/v1/eth2/sign/{pubkey}",
+        headers={"Accept": "application/json"},
+        json={
+            "type": "RANDAO_REVEAL",
+            "fork_info": valid_fork_info,
+            "signing_root": "0x" + "00" * 32,
+            "randao_reveal": {"epoch": "100"},
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
+
+    data = resp.json()
+    assert "signature" in data
+    assert data["signature"].startswith("0x")
+    assert len(data["signature"]) == 194  # 0x + 96 bytes * 2 = 194
+
+
+@pytest.mark.asyncio
+async def test_sign_accept_header_missing_returns_json(
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+    valid_fork_info: dict[str, Any],
+) -> None:
+    """Test that missing Accept header returns JSON response (default)."""
+    # Import a keystore
+    keystore_json = json.dumps(sample_keystore)
+    resp = await client.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
+    )
+    assert resp.status_code == 200
+    pubkey = sample_keystore["pubkey"]
+
+    # Sign without Accept header
+    resp = await client.post(
+        f"/api/v1/eth2/sign/{pubkey}",
+        json={
+            "type": "RANDAO_REVEAL",
+            "fork_info": valid_fork_info,
+            "signing_root": "0x" + "00" * 32,
+            "randao_reveal": {"epoch": "100"},
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
+
+    data = resp.json()
+    assert "signature" in data
+    assert data["signature"].startswith("0x")
+
+
+@pytest.mark.asyncio
+async def test_sign_accept_header_wildcard_returns_json(
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+    valid_fork_info: dict[str, Any],
+) -> None:
+    """Test that Accept: */* returns JSON response."""
+    # Import a keystore
+    keystore_json = json.dumps(sample_keystore)
+    resp = await client.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
+    )
+    assert resp.status_code == 200
+    pubkey = sample_keystore["pubkey"]
+
+    # Sign with Accept: */*
+    resp = await client.post(
+        f"/api/v1/eth2/sign/{pubkey}",
+        headers={"Accept": "*/*"},
+        json={
+            "type": "RANDAO_REVEAL",
+            "fork_info": valid_fork_info,
+            "signing_root": "0x" + "00" * 32,
+            "randao_reveal": {"epoch": "100"},
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "application/json"
+
+    data = resp.json()
+    assert "signature" in data
+    assert data["signature"].startswith("0x")
+
+
+@pytest.mark.asyncio
+async def test_sign_accept_header_text_plain(
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
+    sample_keystore_password: str,
+    valid_fork_info: dict[str, Any],
+) -> None:
+    """Test that Accept: text/plain returns plain text response."""
+    # Import a keystore
+    keystore_json = json.dumps(sample_keystore)
+    resp = await client.post(
+        "/eth/v1/keystores",
+        json={"keystores": [keystore_json], "passwords": [sample_keystore_password]},
+    )
+    assert resp.status_code == 200
+    pubkey = sample_keystore["pubkey"]
+
+    # Sign with Accept: text/plain
+    resp = await client.post(
+        f"/api/v1/eth2/sign/{pubkey}",
+        headers={"Accept": "text/plain"},
+        json={
+            "type": "RANDAO_REVEAL",
+            "fork_info": valid_fork_info,
+            "signing_root": "0x" + "00" * 32,
+            "randao_reveal": {"epoch": "100"},
+        },
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"] == "text/plain; charset=utf-8"
+
+    data = resp.text
+    assert data.startswith("0x")
+    assert len(data) == 194  # 0x + 96 bytes * 2 = 194

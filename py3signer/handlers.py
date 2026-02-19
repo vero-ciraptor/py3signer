@@ -400,12 +400,25 @@ class SigningController(Controller):  # type: ignore[misc]
                 domain=domain,
             )
             signature_hex = signature.to_bytes().hex()
-            # Return just the raw hex string (not JSON) per Web3Signer API spec
-            return Response(
-                content=f"0x{signature_hex}",
-                status_code=HTTP_200_OK,
-                media_type="text/plain",
-            )
+            full_signature = f"0x{signature_hex}"
+
+            # Check Accept header to determine response format
+            accept_header = request.headers.get("Accept", "")
+
+            if accept_header == "text/plain":
+                # Return plain text signature
+                return Response(
+                    content=full_signature,
+                    status_code=HTTP_200_OK,
+                    media_type="text/plain",
+                )
+            else:
+                # Default: return JSON (for application/json, */*, or missing header)
+                return Response(
+                    content={"signature": full_signature},
+                    status_code=HTTP_200_OK,
+                    media_type="application/json",
+                )
         except SignerError as e:
             raise NotFoundException(detail=str(e)) from e
         except Exception as e:
