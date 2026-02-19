@@ -4,12 +4,22 @@ use pyo3::prelude::*;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
-/// Domain separation for BLS signatures (8 bytes)
-fn hash_to_g2(message: &[u8], domain: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(domain);
-    hasher.update(message);
-    hasher.finalize().into()
+/// Ethereum consensus signing uses the signing root directly.
+/// The signing root (32 bytes) is computed by the validator client and
+/// already includes the domain. No additional hashing is needed before
+/// passing to BLS sign.
+fn prepare_message(message: &[u8], _domain: &[u8]) -> [u8; 32] {
+    // The message should already be a 32-byte signing root
+    if message.len() == 32 {
+        message.try_into().expect("Message is 32 bytes")
+    } else {
+        // Fallback: hash if not 32 bytes (should not happen for consensus signing)
+        let mut hasher = Sha256::new();
+        #[allow(clippy::used_underscore_binding)]
+        hasher.update(_domain);
+        hasher.update(message);
+        hasher.finalize().into()
+    }
 }
 
 /// `PyO3` wrapper for BLS `SecretKey`
@@ -137,7 +147,7 @@ fn sign(
     message: &[u8],
     domain: &[u8],
 ) -> PyResult<PySignature> {
-    let hash = hash_to_g2(message, domain);
+    let message_bytes = prepare_message(message, domain);
 
     // Clone the Arc to move it into the closure
     let sk = Arc::clone(&secret_key.inner);
@@ -145,7 +155,11 @@ fn sign(
     // Release the GIL during the BLS signing operation
     let signature = py.detach(move || {
         // blst::min_sig::SecretKey::sign returns Signature directly (not Result)
-        sk.sign(&hash, b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_", &[])
+        sk.sign(
+            &message_bytes,
+            b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_",
+            &[],
+        )
     });
 
     Ok(PySignature { inner: signature })
@@ -161,7 +175,7 @@ fn verify(
     signature: &PySignature,
     domain: &[u8],
 ) -> bool {
-    let hash = hash_to_g2(message, domain);
+    let message_bytes = prepare_message(message, domain);
 
     // Copy the inner values to move them into the closure
     let pk = public_key.inner;
@@ -172,7 +186,7 @@ fn verify(
         // Correct API for min_pk: verify(sig_groupcheck, msg, dst, aug, pk, pk_validate)
         sig.verify(
             true,                                           // sig_groupcheck
-            &hash,                                          // msg (already hashed)
+            &message_bytes,                                 // msg (already the signing root)
             b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_NUL_", // dst
             &[],                                            // aug
             &pk,                                            // pk
