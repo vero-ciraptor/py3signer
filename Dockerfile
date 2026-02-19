@@ -1,30 +1,36 @@
-# Multi-stage Dockerfile for py3signer using uv
-# Stage 1: Build Rust extension
-# Stage 2: Python runtime with uv
+ARG PYTHON_IMAGE_TAG="3.12-slim-bookworm"
+ARG RUST_IMAGE_TAG="1.84-bookworm"
+ARG UV_IMAGE_TAG="0.5"
 
-# Stage 1: Build
-FROM python:3.12-slim-bookworm AS builder
+# uv image
+FROM ghcr.io/astral-sh/uv:${UV_IMAGE_TAG} AS uv-image
 
-# Use bash with pipefail for safer pipe operations
-SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+# Rust toolchain image
+FROM docker.io/library/rust:${RUST_IMAGE_TAG} AS rust-toolchain
 
-# Install Rust toolchain and build dependencies
+# Build stage
+FROM docker.io/library/python:${PYTHON_IMAGE_TAG} AS build
+
+WORKDIR /build
+
+# Install build dependencies
+# hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl=7.88.* \
-    build-essential=12.* \
-    pkg-config=1.8.* \
-    libssl-dev=3.0.* \
+    build-essential \
+    libssl-dev \
+    pkg-config \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Rust
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
+# Copy Rust toolchain from official image
+COPY --from=rust-toolchain /usr/local/cargo /usr/local/cargo
+COPY --from=rust-toolchain /usr/local/rustup /usr/local/rustup
+ENV PATH="/usr/local/cargo/bin:${PATH}"
+ENV RUSTUP_HOME="/usr/local/rustup"
 
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-
-# Set workdir
-WORKDIR /build
+# Install maturin
+RUN --mount=from=uv-image,source=/uv,target=/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system maturin
 
 # Copy project files
 COPY Cargo.toml .
@@ -33,56 +39,35 @@ COPY py3signer/__init__.py py3signer/__init__.py
 COPY pyproject.toml .
 COPY README.md .
 
-# Create virtual environment, install maturin, and build the Rust extension
-RUN uv venv && \
-    uv pip install maturin && \
-    uv run maturin build --release -o dist
+# Build Rust extension
+RUN --mount=type=cache,target=/root/.cache/uv \
+    maturin build --release -o dist
 
-# Stage 2: Runtime
-FROM python:3.12-slim-bookworm
-
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libssl3=3.0.* \
-    ca-certificates=2023* \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# Runtime stage
+FROM docker.io/library/python:${PYTHON_IMAGE_TAG}
 
 # Create non-root user
-RUN groupadd -r py3signer && useradd -r -g py3signer py3signer
+RUN groupadd -g 1000 py3signer && \
+    useradd --no-create-home --shell /bin/false -u 1000 -g py3signer py3signer
 
-# Set workdir
 WORKDIR /app
 
-# Copy Python package
-COPY py3signer/ py3signer/
+# Install runtime dependencies and Python package
+RUN --mount=from=uv-image,source=/uv,target=/bin/uv \
+    --mount=from=build,source=/build/dist,target=/tmp/dist \
+    --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system /tmp/dist/*.whl
 
-# Copy built extension from builder
-COPY --from=builder /build/dist/*.whl /tmp/
+# Copy application code
+COPY --chown=py3signer:py3signer py3signer/ py3signer/
 
-# Create virtual environment, install dependencies, clean up, and create cache directory
-RUN uv venv && \
-    uv pip install /tmp/*.whl "litestar[standard]>=2.15.0" "granian>=2.0.0" "msgspec>=0.19.0" "prometheus-client>=0.21.0" && \
-    rm /tmp/*.whl && \
-    mkdir -p /app/.cache/uv && chown -R py3signer:py3signer /app/.cache
-
-# Change to non-root user
+# Switch to non-root user
 USER py3signer
 
-# Set uv cache directory (writable by py3signer user)
-ENV UV_CACHE_DIR=/app/.cache/uv
-
-# Expose port
 EXPOSE 8080
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
 
-# Set entrypoint using py3signer CLI (which uses Granian internally)
-ENTRYPOINT ["uv", "run", "python", "-m", "py3signer"]
-
-# Default arguments
+ENTRYPOINT ["python", "-m", "py3signer"]
 CMD ["--host", "0.0.0.0", "--port", "8080"]
