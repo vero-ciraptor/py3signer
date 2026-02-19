@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
 from litestar import Litestar
+from litestar.datastructures import State
 
 from .bulk_loader import load_input_only_keystores, load_keystores_from_directory
 from .config import Config
@@ -63,11 +64,11 @@ def create_app(
         route_handlers=get_routers(),
         lifespan=[lifespan],
         debug=False,
-        state={
+        state=State({
             "storage": storage,
             "signer": signer,
             "auth_token": auth_token,
-        },
+        }),
     )
 
     return app
