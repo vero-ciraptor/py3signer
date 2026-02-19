@@ -87,6 +87,11 @@ def get_app() -> Litestar:
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
 
+        # Set worker count for multi-process metrics if not already set
+        # This ensures workers know we're in multi-process mode
+        if "PY3SIGNER_WORKERS" not in os.environ:
+            os.environ["PY3SIGNER_WORKERS"] = str(getattr(config, "workers", 1))
+
         _app_instance = create_app(config)
 
     return _app_instance
