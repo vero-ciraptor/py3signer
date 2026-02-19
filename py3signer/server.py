@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import multiprocessing
-import os
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
@@ -15,6 +14,7 @@ from litestar.datastructures import State
 
 from .bulk_loader import load_external_keystores
 from .handlers import get_routers
+from .metrics import MetricsServer
 from .signer import Signer
 from .storage import KeyStorage
 
@@ -44,7 +44,6 @@ def _load_managed_keystores(
         Tuple of (success_count, failure_count)
 
     """
-
     from .bulk_loader import load_keystore_with_password, scan_keystore_directory
     from .keystore import KeystoreError
 
@@ -96,9 +95,6 @@ def create_app(
     signer: Signer | None = None,
 ) -> Litestar:
     """Create and configure the Litestar application."""
-    # Import metrics here to ensure PROMETHEUS_MULTIPROC_DIR is already set
-    from .metrics import KEYS_LOADED
-
     # If config is provided but storage/signer are not, create them
     if config is not None and (storage is None or signer is None):
         storage = KeyStorage(
@@ -144,9 +140,6 @@ def create_app(
     if signer is None:
         signer = Signer(storage)
 
-    # Update keys_loaded metric for this worker process
-    KEYS_LOADED.set(len(storage))
-
     @asynccontextmanager
     async def lifespan(_app: Litestar) -> AsyncGenerator[None]:
         """Lifespan context manager for startup/shutdown."""
@@ -180,10 +173,6 @@ async def run_server(config: Config) -> None:
     # Run with Granian ASGI using factory pattern for multi-worker support
     workers = getattr(config, "workers", multiprocessing.cpu_count())
 
-    # Set worker count for multi-process metrics BEFORE importing metrics module
-    # This must be done before any worker processes are spawned
-    os.environ["PY3SIGNER_WORKERS"] = str(workers)
-
     # Map py3signer log levels to Granian log levels
     granian_log_level = config.log_level.lower()
 
@@ -196,10 +185,7 @@ async def run_server(config: Config) -> None:
         log_level=granian_log_level,
     )
 
-    # Import and start metrics server in the main process (not workers)
-    # Import after setting PY3SIGNER_WORKERS so metrics knows about multi-process mode
-    from .metrics import MetricsServer
-
+    # Start metrics server in the main process (not workers)
     metrics_server = MetricsServer(host=config.metrics_host, port=config.metrics_port)
     metrics_server.start()
 

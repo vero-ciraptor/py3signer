@@ -2,20 +2,12 @@
 
 This module defines and exposes all Prometheus metrics used by py3signer.
 Metrics are served on a separate port using prometheus_client's built-in HTTP server.
-
-Multi-process support:
-When running with multiple Granian workers, each process has its own memory space.
-Prometheus client supports multi-process mode via files in PROMETHEUS_MULTIPROC_DIR.
-This module automatically detects multi-process mode and configures the registry accordingly.
 """
 
 from __future__ import annotations
 
 import logging
-import os
-import tempfile
 import threading
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from litestar import Controller, get
@@ -30,7 +22,6 @@ from prometheus_client import (
     generate_latest,
     start_http_server,
 )
-from prometheus_client.multiprocess import MultiProcessCollector
 
 if TYPE_CHECKING:
     from http.server import ThreadingHTTPServer
@@ -38,80 +29,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-def _setup_multiproc_dir() -> Path | None:
-    """Set up Prometheus multi-process directory if needed.
-
-    Returns:
-        Path to the multi-process directory, or None if not needed.
-    """
-    # Check if already configured
-    if "PROMETHEUS_MULTIPROC_DIR" in os.environ:
-        multiproc_dir = Path(os.environ["PROMETHEUS_MULTIPROC_DIR"])
-        logger.debug(f"Using existing PROMETHEUS_MULTIPROC_DIR: {multiproc_dir}")
-        return multiproc_dir
-
-    # Check if we need multi-process mode (workers > 1)
-    # Granian sets this or we detect from config
-    workers = int(os.environ.get("PY3SIGNER_WORKERS", "1"))
-    if workers <= 1:
-        logger.debug("Single worker mode, no multi-process metrics needed")
-        return None
-
-    # Create a temporary directory for multi-process metrics
-    multiproc_dir = Path(tempfile.gettempdir()) / "py3signer_metrics"
-    multiproc_dir.mkdir(parents=True, exist_ok=True)
-    os.environ["PROMETHEUS_MULTIPROC_DIR"] = str(multiproc_dir)
-
-    logger.info(
-        f"Multi-process mode detected ({workers} workers). "
-        f"Using PROMETHEUS_MULTIPROC_DIR: {multiproc_dir}"
-    )
-    return multiproc_dir
-
-
-def _cleanup_multiproc_dir(multiproc_dir: Path) -> None:
-    """Clean up multi-process metrics files from a previous run.
-
-    This prevents stale metrics from affecting the current run.
-    """
-    if not multiproc_dir.exists():
-        return
-
-    # Clean up old gauge_*.db files from prometheus_client multi-process mode
-    for pattern in [
-        "gauge_*.db",
-        "counter_*.db",
-        "histogram_*.db",
-        "summary_*.db",
-        "*_*.db",
-    ]:
-        for file_path in multiproc_dir.glob(pattern):
-            try:
-                file_path.unlink()
-                logger.debug(f"Cleaned up stale metrics file: {file_path}")
-            except OSError:
-                pass
-
-
-# Set up multi-process directory if needed
-_MULTIPROC_DIR = _setup_multiproc_dir()
-if _MULTIPROC_DIR is not None:
-    _cleanup_multiproc_dir(_MULTIPROC_DIR)
-
-
-# Create registry - use multi-process collector when in multi-process mode
-if _MULTIPROC_DIR is not None:
-    # In multi-process mode, we need to use MultiProcessCollector
-    # This aggregates metrics from all worker processes
-    REGISTRY = CollectorRegistry()
-    MultiProcessCollector(REGISTRY, path=str(_MULTIPROC_DIR))  # type: ignore[no-untyped-call]
-    logger.debug("Using MultiProcessCollector for multi-process metrics")
-else:
-    # Single process mode - use a dedicated registry
-    REGISTRY = CollectorRegistry()
-    logger.debug("Using standard CollectorRegistry")
-
+# Create a dedicated registry for py3signer metrics
+REGISTRY = CollectorRegistry()
 
 # Application info
 APP_INFO = Info(
@@ -149,7 +68,6 @@ KEYS_LOADED = Gauge(
     "keys_loaded",
     "Number of keys currently loaded",
     registry=REGISTRY,
-    multiprocess_mode="livesum",  # Sum across all processes
 )
 
 # HTTP metrics
@@ -214,9 +132,6 @@ class MetricsServer:
 
     This runs the metrics endpoint on a separate port from the main API,
     allowing metrics to be scraped independently.
-
-    In multi-process mode, this aggregates metrics from all worker processes
-    using the MultiProcessCollector.
     """
 
     def __init__(self, host: str = "127.0.0.1", port: int = 8081) -> None:
