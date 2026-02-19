@@ -5,9 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from py3signer.config import Config
-from py3signer.server import create_app
-
 if TYPE_CHECKING:
     from litestar.testing import AsyncTestClient
 
@@ -260,42 +257,6 @@ async def test_list_public_keys_after_import(
     if not expected_pubkey.startswith("0x"):
         expected_pubkey = "0x" + expected_pubkey
     assert data[0] == expected_pubkey
-
-
-@pytest.mark.parametrize(
-    "endpoint",
-    [
-        "/eth/v1/keystores",
-        "/api/v1/eth2/publicKeys",
-    ],
-)
-@pytest.mark.asyncio
-async def test_auth_token_required(endpoint: str) -> None:
-    """Test that auth token is required when configured."""
-    from litestar.testing import AsyncTestClient
-
-    config = Config(host="127.0.0.1", port=8080, auth_token="secret_token")
-
-    app = create_app(config)
-
-    async with AsyncTestClient(app) as client:
-        # Request without auth should fail
-        resp = await client.get(endpoint)
-        assert resp.status_code == 401
-
-        # Request with wrong auth should fail
-        resp = await client.get(
-            endpoint,
-            headers={"Authorization": "Bearer wrong_token"},
-        )
-        assert resp.status_code == 401
-
-        # Request with correct auth should succeed
-        resp = await client.get(
-            endpoint,
-            headers={"Authorization": "Bearer secret_token"},
-        )
-        assert resp.status_code == 200
 
 
 @pytest.mark.asyncio

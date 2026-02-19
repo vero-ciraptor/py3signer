@@ -9,7 +9,6 @@ from litestar import Controller, Request, Response, Router, delete, get, post
 from litestar.exceptions import HTTPException, NotFoundException, ValidationException
 from litestar.status_codes import (
     HTTP_200_OK,
-    HTTP_401_UNAUTHORIZED,
     HTTP_500_INTERNAL_SERVER_ERROR,
     HTTP_501_NOT_IMPLEMENTED,
 )
@@ -118,31 +117,6 @@ def _get_signer(request: Request) -> Signer:
     return result
 
 
-def _get_auth_token(request: Request) -> str | None:
-    """Get auth token from app state."""
-    result: str | None = request.app.state["auth_token"]
-    return result
-
-
-def _check_auth(request: Request) -> None:
-    """Check if request is authenticated."""
-    auth_token = _get_auth_token(request)
-    if auth_token is None:
-        return
-
-    auth_header = request.headers.get("Authorization", "")
-    if not auth_header.startswith("Bearer "):
-        raise HTTPException(
-            status_code=HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized",
-        )
-    if auth_header[7:] != auth_token:
-        raise HTTPException(
-            status_code=HTTP_401_UNAUTHORIZED,
-            detail="Unauthorized",
-        )
-
-
 # Controllers
 
 
@@ -174,7 +148,6 @@ class KeystoreController(Controller):  # type: ignore[misc]
     @get()  # type: ignore[untyped-decorator]
     async def list_keystores(self, request: Request) -> Response[dict[str, Any]]:
         """GET /eth/v1/keystores - List all imported keys."""
-        _check_auth(request)
         storage = _get_storage(request)
 
         keys = storage.list_keys()
@@ -194,7 +167,6 @@ class KeystoreController(Controller):  # type: ignore[misc]
         data: dict[str, Any],
     ) -> Response[dict[str, Any]]:
         """POST /eth/v1/keystores - Import keystores."""
-        _check_auth(request)
         storage = _get_storage(request)
 
         # Validate request manually since msgspec doesn't integrate directly
@@ -273,7 +245,6 @@ class KeystoreController(Controller):  # type: ignore[misc]
         data: dict[str, Any],
     ) -> Response[dict[str, Any]]:
         """DELETE /eth/v1/keystores - Delete keystores."""
-        _check_auth(request)
         storage = _get_storage(request)
 
         try:
@@ -319,13 +290,11 @@ class RemoteKeysController(Controller):  # type: ignore[misc]
     @get()  # type: ignore[untyped-decorator]
     async def list_remote_keys(self, request: Request) -> Response[dict[str, Any]]:
         """GET /eth/v1/remotekeys - List remote keys (stub)."""
-        _check_auth(request)
         return Response(content={"data": []}, status_code=HTTP_200_OK)
 
     @post()  # type: ignore[untyped-decorator]
     async def add_remote_keys(self, request: Request) -> Response[dict[str, Any]]:
         """POST /eth/v1/remotekeys - Add remote keys (stub)."""
-        _check_auth(request)
         return Response(
             content={"data": [], "message": "Remote keys not supported"},
             status_code=HTTP_501_NOT_IMPLEMENTED,
@@ -334,7 +303,6 @@ class RemoteKeysController(Controller):  # type: ignore[misc]
     @delete(status_code=HTTP_501_NOT_IMPLEMENTED)  # type: ignore[untyped-decorator]
     async def delete_remote_keys(self, request: Request) -> Response[dict[str, Any]]:
         """DELETE /eth/v1/remotekeys - Delete remote keys (stub)."""
-        _check_auth(request)
         return Response(
             content={"data": [], "message": "Remote keys not supported"},
             status_code=HTTP_501_NOT_IMPLEMENTED,
@@ -349,7 +317,6 @@ class SigningController(Controller):  # type: ignore[misc]
     @get("/publicKeys")  # type: ignore[untyped-decorator]
     async def list_public_keys(self, request: Request) -> Response[list[str]]:
         """GET /api/v1/eth2/publicKeys - List available BLS public keys."""
-        _check_auth(request)
         storage = _get_storage(request)
         keys = storage.list_keys()
         public_keys = [f"0x{pubkey}" for pubkey, _, _ in keys]
@@ -358,7 +325,6 @@ class SigningController(Controller):  # type: ignore[misc]
     @post("/sign/{identifier:str}")  # type: ignore[untyped-decorator]
     async def sign(self, request: Request, identifier: str) -> Response:
         """POST /api/v1/eth2/sign/:identifier - Sign data."""
-        _check_auth(request)
         signer = _get_signer(request)
 
         pubkey_hex = identifier.lower().replace("0x", "")

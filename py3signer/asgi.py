@@ -32,10 +32,6 @@ def load_config_from_env() -> Config | None:
     try:
         config_dict = json.loads(config_json)
         # Convert string paths back to Path objects
-        if config_dict.get("tls_cert"):
-            config_dict["tls_cert"] = Path(config_dict["tls_cert"])
-        if config_dict.get("tls_key"):
-            config_dict["tls_key"] = Path(config_dict["tls_key"])
         if config_dict.get("key_store_path"):
             config_dict["key_store_path"] = Path(config_dict["key_store_path"])
         if config_dict.get("keystores_path"):
@@ -55,10 +51,7 @@ def store_config_in_env(config: Config) -> None:
     config_dict = {
         "host": config.host,
         "port": config.port,
-        "tls_cert": str(config.tls_cert) if config.tls_cert else None,
-        "tls_key": str(config.tls_key) if config.tls_key else None,
         "log_level": config.log_level,
-        "auth_token": config.auth_token,
         "metrics_host": config.metrics_host,
         "metrics_port": config.metrics_port,
         "key_store_path": str(config.key_store_path) if config.key_store_path else None,

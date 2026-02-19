@@ -14,15 +14,8 @@ class Config(msgspec.Struct, frozen=True):
     host: str = "127.0.0.1"
     port: int = 8080
 
-    # TLS settings (optional)
-    tls_cert: Path | None = None
-    tls_key: Path | None = None
-
     # Logging
     log_level: str = "INFO"
-
-    # Security
-    auth_token: str | None = None
 
     # Metrics settings
     metrics_host: str = "127.0.0.1"
@@ -49,20 +42,6 @@ class Config(msgspec.Struct, frozen=True):
             raise ValueError(
                 f"log_level must be one of {valid_levels}, got {self.log_level}",
             )
-
-        # Validate TLS configuration
-        has_cert = self.tls_cert is not None
-        has_key = self.tls_key is not None
-        if has_cert != has_key:
-            raise ValueError(
-                "Both tls_cert and tls_key must be provided together, or neither",
-            )
-
-        if self.tls_cert is not None and not self.tls_cert.exists():
-            raise ValueError(f"tls_cert file not found: {self.tls_cert}")
-
-        if self.tls_key is not None and not self.tls_key.exists():
-            raise ValueError(f"tls_key file not found: {self.tls_key}")
 
         # Validate metrics port
         if self.metrics_port < 1 or self.metrics_port > 65535:
@@ -141,27 +120,10 @@ def get_config() -> Config:
         help="HTTP server port (default: 8080)",
     )
     parser.add_argument(
-        "--tls-cert",
-        type=Path,
-        default=None,
-        help="Path to TLS certificate file",
-    )
-    parser.add_argument(
-        "--tls-key",
-        type=Path,
-        default=None,
-        help="Path to TLS private key file",
-    )
-    parser.add_argument(
         "--log-level",
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         default="INFO",
         help="Logging level (default: INFO)",
-    )
-    parser.add_argument(
-        "--auth-token",
-        default=None,
-        help="Bearer token for API authentication",
     )
     parser.add_argument(
         "--metrics-port",
@@ -206,10 +168,7 @@ def get_config() -> Config:
     config_dict: dict[str, object] = {
         "host": args.host,
         "port": args.port,
-        "tls_cert": args.tls_cert,
-        "tls_key": args.tls_key,
         "log_level": args.log_level,
-        "auth_token": args.auth_token,
         "metrics_port": args.metrics_port,
         "metrics_host": args.metrics_host,
         "key_store_path": args.key_store_path,

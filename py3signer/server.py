@@ -63,8 +63,6 @@ def create_app(
     if signer is None:
         signer = Signer(storage)
 
-    auth_token = config.auth_token if config else None
-
     @asynccontextmanager
     async def lifespan(_app: Litestar) -> AsyncGenerator[None]:
         """Lifespan context manager for startup/shutdown."""
@@ -81,7 +79,6 @@ def create_app(
             {
                 "storage": storage,
                 "signer": signer,
-                "auth_token": auth_token,
             },
         ),
     )
@@ -99,10 +96,6 @@ async def run_server(config: Config) -> None:
     # Run with Granian ASGI using factory pattern for multi-worker support
     workers = getattr(config, "workers", multiprocessing.cpu_count())
 
-    # Build ssl_key and ssl_cert for Granian
-    ssl_key = str(config.tls_key) if config.tls_key else None
-    ssl_cert = str(config.tls_cert) if config.tls_cert else None
-
     # Map py3signer log levels to Granian log levels
     granian_log_level = config.log_level.lower()
 
@@ -112,8 +105,6 @@ async def run_server(config: Config) -> None:
         port=config.port,
         interface=Interfaces.ASGI,
         workers=workers,
-        ssl_key=ssl_key,
-        ssl_cert=ssl_cert,
         log_level=granian_log_level,
     )
 
