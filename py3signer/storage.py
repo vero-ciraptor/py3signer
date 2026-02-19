@@ -60,13 +60,19 @@ class KeyStorage:
         try:
             # Atomic writes using temp files
             with tempfile.NamedTemporaryFile(
-                mode="w", dir=self._keystore_path, suffix=".tmp", delete=False
+                mode="w",
+                dir=self._keystore_path,
+                suffix=".tmp",
+                delete=False,
             ) as f:
                 f.write(keystore_json)
                 keystore_temp = f.name
 
             with tempfile.NamedTemporaryFile(
-                mode="w", dir=self._keystore_path, suffix=".tmp", delete=False
+                mode="w",
+                dir=self._keystore_path,
+                suffix=".tmp",
+                delete=False,
             ) as f:
                 f.write(password)
                 password_temp = f.name
@@ -129,6 +135,7 @@ class KeyStorage:
 
         Returns:
             Tuple of (pubkey_hex, persisted) where persisted indicates if disk write occurred.
+
         """
         pubkey_hex = pubkey.to_bytes().hex()
 
@@ -169,6 +176,7 @@ class KeyStorage:
 
         Returns:
             Tuple of (removed_from_memory, deleted_from_disk).
+
         """
         if pubkey_hex not in self._keys:
             return False, False

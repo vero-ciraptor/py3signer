@@ -174,7 +174,9 @@ class KeystoreController(Controller):  # type: ignore[misc]
 
     @post()  # type: ignore[untyped-decorator]
     async def import_keystores(
-        self, request: Request, data: dict[str, Any]
+        self,
+        request: Request,
+        data: dict[str, Any],
     ) -> Response[dict[str, Any]]:
         """POST /eth/v1/keystores - Import keystores."""
         _check_auth(request)
@@ -204,7 +206,7 @@ class KeystoreController(Controller):  # type: ignore[misc]
                         KeystoreImportResult(
                             status="duplicate",
                             message=f"Keystore already exists for pubkey {keystore.pubkey}",
-                        )
+                        ),
                     )
                     continue
 
@@ -220,7 +222,7 @@ class KeystoreController(Controller):  # type: ignore[misc]
 
                 if persistence_enabled and not persisted:
                     logger.warning(
-                        f"Failed to persist keystore to disk: {pubkey_hex[:20]}..."
+                        f"Failed to persist keystore to disk: {pubkey_hex[:20]}...",
                     )
 
                 existing_keys.add(pubkey_hex)
@@ -228,7 +230,7 @@ class KeystoreController(Controller):  # type: ignore[misc]
                     KeystoreImportResult(
                         status="imported",
                         message=f"Successfully imported keystore with pubkey {keystore.pubkey}",
-                    )
+                    ),
                 )
 
             except KeystoreError as e:
@@ -236,7 +238,10 @@ class KeystoreController(Controller):  # type: ignore[misc]
             except Exception as e:
                 logger.exception("Unexpected error importing keystore")
                 results.append(
-                    KeystoreImportResult(status="error", message=f"Internal error: {e}")
+                    KeystoreImportResult(
+                        status="error",
+                        message=f"Internal error: {e}",
+                    ),
                 )
 
         return Response(
@@ -246,7 +251,9 @@ class KeystoreController(Controller):  # type: ignore[misc]
 
     @delete(status_code=HTTP_200_OK)  # type: ignore[untyped-decorator]
     async def delete_keystores(
-        self, request: Request, data: dict[str, Any]
+        self,
+        request: Request,
+        data: dict[str, Any],
     ) -> Response[dict[str, Any]]:
         """DELETE /eth/v1/keystores - Delete keystores."""
         _check_auth(request)
@@ -267,7 +274,7 @@ class KeystoreController(Controller):  # type: ignore[misc]
 
             if removed and storage.keystore_path is not None and not deleted:
                 logger.warning(
-                    f"Failed to delete keystore files from disk: {pubkey_hex_clean[:20]}..."
+                    f"Failed to delete keystore files from disk: {pubkey_hex_clean[:20]}...",
                 )
 
             if removed:
@@ -275,14 +282,14 @@ class KeystoreController(Controller):  # type: ignore[misc]
                     KeystoreDeleteResult(
                         status="deleted",
                         message=f"Successfully deleted keystore with pubkey {pubkey_hex}",
-                    )
+                    ),
                 )
             else:
                 results.append(
                     KeystoreDeleteResult(
                         status="not_found",
                         message=f"Keystore not found for pubkey {pubkey_hex}",
-                    )
+                    ),
                 )
 
         return Response(
@@ -362,7 +369,7 @@ class SigningController(Controller):  # type: ignore[misc]
         if message is None:
             raise ValidationException(
                 detail="signing_root is required - SSZ signing root computation from request data "
-                "is not yet implemented. Please provide signing_root in the request."
+                "is not yet implemented. Please provide signing_root in the request.",
             )
 
         try:
@@ -375,7 +382,9 @@ class SigningController(Controller):  # type: ignore[misc]
 
         try:
             signature = signer.sign_data(
-                pubkey_hex=pubkey_hex, data=message, domain=domain
+                pubkey_hex=pubkey_hex,
+                data=message,
+                domain=domain,
             )
             signature_hex = signature.to_bytes().hex()
             # Return just the raw hex string (not JSON) per Web3Signer API spec

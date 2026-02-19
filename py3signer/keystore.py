@@ -25,6 +25,7 @@ def normalize_password(password: str) -> str:
 
     Returns:
         Normalized password string
+
     """
     # NFKD normalization
     normalized = unicodedata.normalize("NFKD", password)
@@ -43,8 +44,6 @@ def normalize_password(password: str) -> str:
 
 class KeystoreError(Exception):
     """Error decrypting or parsing keystore."""
-
-    pass
 
 
 class Keystore(msgspec.Struct):
@@ -68,7 +67,7 @@ class Keystore(msgspec.Struct):
         if self.version != 4:
             raise KeystoreError(
                 f"Keystore version {self.version} is not supported, "
-                "only version 4 (EIP-2335) is supported"
+                "only version 4 (EIP-2335) is supported",
             )
 
         if (

@@ -39,7 +39,7 @@ def load_config_from_env() -> Config | None:
             config_dict["keystores_path"] = Path(config_dict["keystores_path"])
         if config_dict.get("keystores_passwords_path"):
             config_dict["keystores_passwords_path"] = Path(
-                config_dict["keystores_passwords_path"]
+                config_dict["keystores_passwords_path"],
             )
         return msgspec.convert(config_dict, Config)
     except Exception as e:
@@ -81,7 +81,7 @@ def get_app() -> Litestar:
         config = load_config_from_env()
         if config is None:
             raise RuntimeError(
-                "Configuration not found. Use 'python -m py3signer' to start the server properly."
+                "Configuration not found. Use 'python -m py3signer' to start the server properly.",
             )
 
         # Setup logging
@@ -98,7 +98,9 @@ def get_app() -> Litestar:
 # ASGI application callable
 # Granian calls this with (scope, receive, send)
 async def app(
-    scope: dict[str, Any], receive: Callable[..., Any], send: Callable[..., Any]
+    scope: dict[str, Any],
+    receive: Callable[..., Any],
+    send: Callable[..., Any],
 ) -> None:
     """ASGI application entry point."""
     litestar_app = get_app()

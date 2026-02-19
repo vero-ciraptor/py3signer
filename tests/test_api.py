@@ -45,7 +45,9 @@ async def test_health_endpoint(client: AsyncTestClient) -> None:
 )
 @pytest.mark.asyncio
 async def test_list_empty(
-    client: AsyncTestClient, endpoint: str, extract_key: str | None
+    client: AsyncTestClient,
+    endpoint: str,
+    extract_key: str | None,
 ) -> None:
     """Test listing endpoints when none are loaded."""
     resp = await client.get(endpoint)
@@ -88,7 +90,8 @@ async def test_import_keystore_validation_errors(
 ) -> None:
     """Test importing with various validation errors."""
     resp = await client.post(
-        "/eth/v1/keystores", json={"keystores": keystores, "passwords": passwords}
+        "/eth/v1/keystores",
+        json={"keystores": keystores, "passwords": passwords},
     )
     assert resp.status_code == 400
 
@@ -118,7 +121,8 @@ async def test_import_keystore_success(
 
 @pytest.mark.asyncio
 async def test_import_keystore_wrong_password(
-    client: AsyncTestClient, sample_keystore: dict[str, Any]
+    client: AsyncTestClient,
+    sample_keystore: dict[str, Any],
 ) -> None:
     """Test importing with wrong password."""
     keystore_json = json.dumps(sample_keystore)
@@ -192,7 +196,9 @@ async def test_delete_keystore(
 async def test_delete_nonexistent_keystore(client: AsyncTestClient) -> None:
     """Test deleting a keystore that doesn't exist."""
     resp = await client.request(
-        "DELETE", "/eth/v1/keystores", content=json.dumps({"pubkeys": ["a" * 96]})
+        "DELETE",
+        "/eth/v1/keystores",
+        content=json.dumps({"pubkeys": ["a" * 96]}),
     )
     assert resp.status_code == 200
 
@@ -204,7 +210,9 @@ async def test_delete_nonexistent_keystore(client: AsyncTestClient) -> None:
 async def test_delete_empty_pubkeys(client: AsyncTestClient) -> None:
     """Test deleting with empty pubkeys array."""
     resp = await client.request(
-        "DELETE", "/eth/v1/keystores", content=json.dumps({"pubkeys": []})
+        "DELETE",
+        "/eth/v1/keystores",
+        content=json.dumps({"pubkeys": []}),
     )
     assert resp.status_code == 400
 
@@ -275,13 +283,15 @@ async def test_auth_token_required(endpoint: str) -> None:
 
         # Request with wrong auth should fail
         resp = await client.get(
-            endpoint, headers={"Authorization": "Bearer wrong_token"}
+            endpoint,
+            headers={"Authorization": "Bearer wrong_token"},
         )
         assert resp.status_code == 401
 
         # Request with correct auth should succeed
         resp = await client.get(
-            endpoint, headers={"Authorization": "Bearer secret_token"}
+            endpoint,
+            headers={"Authorization": "Bearer secret_token"},
         )
         assert resp.status_code == 200
 
@@ -340,7 +350,9 @@ async def test_delete_keystore_with_persistence(
 
     # Then delete
     resp = await client_with_persistence.request(
-        "DELETE", "/eth/v1/keystores", content=json.dumps({"pubkeys": [pubkey]})
+        "DELETE",
+        "/eth/v1/keystores",
+        content=json.dumps({"pubkeys": [pubkey]}),
     )
     assert resp.status_code == 200
 
@@ -425,7 +437,8 @@ async def test_sign_validation_errors(
 
 @pytest.mark.asyncio
 async def test_sign_key_not_found(
-    client: AsyncTestClient, valid_fork_info: dict[str, Any]
+    client: AsyncTestClient,
+    valid_fork_info: dict[str, Any],
 ) -> None:
     """Test signing with non-existent key."""
     pubkey = "a" * 96
@@ -449,7 +462,8 @@ async def test_sign_key_not_found(
 
 @pytest.mark.asyncio
 async def test_sign_missing_signing_root(
-    client: AsyncTestClient, valid_fork_info: dict[str, Any]
+    client: AsyncTestClient,
+    valid_fork_info: dict[str, Any],
 ) -> None:
     """Test signing without signing_root - returns error since SSZ computation is not implemented."""
     pubkey = "a" * 96
@@ -677,7 +691,9 @@ async def test_full_flow(
 
     # 4. Delete
     resp = await client.request(
-        "DELETE", "/eth/v1/keystores", content=json.dumps({"pubkeys": [pubkey]})
+        "DELETE",
+        "/eth/v1/keystores",
+        content=json.dumps({"pubkeys": [pubkey]}),
     )
     assert resp.status_code == 200
     data = resp.json()

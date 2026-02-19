@@ -31,6 +31,7 @@ class Fork(msgspec.Struct, frozen=True):
         previous_version: Previous fork version (4 bytes)
         current_version: Current fork version (4 bytes)
         epoch: Fork epoch
+
     """
 
     previous_version: str
@@ -44,6 +45,7 @@ class ForkInfo(msgspec.Struct, frozen=True):
     Attributes:
         fork: The fork details
         genesis_validators_root: The genesis validators root (32 bytes)
+
     """
 
     fork: Fork
@@ -156,7 +158,11 @@ class ValidatorRegistration(msgspec.Struct, frozen=True):
 
 
 class AggregationSlotSignRequest(
-    msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag="AGGREGATION_SLOT"
+    msgspec.Struct,
+    kw_only=True,
+    frozen=True,
+    tag_field="type",
+    tag="AGGREGATION_SLOT",
 ):
     """Request to sign an aggregation slot."""
 
@@ -194,7 +200,11 @@ class AggregateAndProofV2SignRequest(
 
 
 class AttestationSignRequest(
-    msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag="ATTESTATION"
+    msgspec.Struct,
+    kw_only=True,
+    frozen=True,
+    tag_field="type",
+    tag="ATTESTATION",
 ):
     """Request to sign an attestation."""
 
@@ -204,7 +214,11 @@ class AttestationSignRequest(
 
 
 class BlockSignRequest(
-    msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag="BLOCK"
+    msgspec.Struct,
+    kw_only=True,
+    frozen=True,
+    tag_field="type",
+    tag="BLOCK",
 ):
     """Request to sign a beacon block (deprecated)."""
 
@@ -214,7 +228,11 @@ class BlockSignRequest(
 
 
 class BlockV2SignRequest(
-    msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag="BLOCK_V2"
+    msgspec.Struct,
+    kw_only=True,
+    frozen=True,
+    tag_field="type",
+    tag="BLOCK_V2",
 ):
     """Request to sign a versioned beacon block."""
 
@@ -224,7 +242,11 @@ class BlockV2SignRequest(
 
 
 class DepositSignRequest(
-    msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag="DEPOSIT"
+    msgspec.Struct,
+    kw_only=True,
+    frozen=True,
+    tag_field="type",
+    tag="DEPOSIT",
 ):
     """Request to sign a deposit."""
 
@@ -234,7 +256,11 @@ class DepositSignRequest(
 
 
 class RandaoRevealSignRequest(
-    msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag="RANDAO_REVEAL"
+    msgspec.Struct,
+    kw_only=True,
+    frozen=True,
+    tag_field="type",
+    tag="RANDAO_REVEAL",
 ):
     """Request to sign a RANDAO reveal."""
 
@@ -244,7 +270,11 @@ class RandaoRevealSignRequest(
 
 
 class VoluntaryExitSignRequest(
-    msgspec.Struct, kw_only=True, frozen=True, tag_field="type", tag="VOLUNTARY_EXIT"
+    msgspec.Struct,
+    kw_only=True,
+    frozen=True,
+    tag_field="type",
+    tag="VOLUNTARY_EXIT",
 ):
     """Request to sign a voluntary exit."""
 
@@ -342,6 +372,7 @@ def get_domain_for_request(request: SignRequest) -> bytes:
 
     Returns:
         The 4-byte domain for this signing type
+
     """
     match request:
         case AggregationSlotSignRequest():
@@ -381,6 +412,7 @@ def validate_signing_root(signing_root: str | None) -> bytes | None:
 
     Raises:
         ValueError: If signing_root is invalid
+
     """
     if signing_root is None:
         return None

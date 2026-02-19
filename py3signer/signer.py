@@ -18,8 +18,6 @@ logger = logging.getLogger(__name__)
 class SignerError(Exception):
     """Error during signing operation."""
 
-    pass
-
 
 class Signer:
     """Handles BLS signing operations."""
@@ -45,6 +43,7 @@ class Signer:
 
         Raises:
             SignerError: If key not found or signing fails
+
         """
         if len(domain) != 4:
             raise SignerError(f"Domain must be 4 bytes, got {len(domain)}")

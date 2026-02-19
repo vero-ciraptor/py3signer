@@ -80,11 +80,11 @@ EIP2335_PBKDF2_KEYSTORE: dict[str, Any] = {
 }
 
 # Password with unicode characters (NFKD normalized and control codes stripped)
-EIP2335_PASSWORD = "𝔱𝔢𝔰𝔱𝔭𝔞𝔰𝔰𝔴𝔬𝔯𝔡🔑"
+EIP2335_PASSWORD = "𝔱𝔢𝔰𝔱𝔭𝔞𝔰𝔰𝔴𝔬𝔯𝔡🔑"  # noqa: RUF001
 
 # Expected secret
 EIP2335_SECRET = bytes.fromhex(
-    "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f"
+    "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
 )
 
 
@@ -103,7 +103,7 @@ class TestEIP2335OfficialVectors:
         pubkey = secret_key.public_key()
         expected_pubkey = bytes.fromhex(
             "9612d7a727c9d0a22e185a1c768478dfe919cada9266988cb32359c11f2b7b27"
-            "f4ae4040902382ae2910c15e2b420d07"
+            "f4ae4040902382ae2910c15e2b420d07",
         )
         assert pubkey.to_bytes() == expected_pubkey
 
@@ -119,7 +119,7 @@ class TestEIP2335OfficialVectors:
         pubkey = secret_key.public_key()
         expected_pubkey = bytes.fromhex(
             "9612d7a727c9d0a22e185a1c768478dfe919cada9266988cb32359c11f2b7b27"
-            "f4ae4040902382ae2910c15e2b420d07"
+            "f4ae4040902382ae2910c15e2b420d07",
         )
         assert pubkey.to_bytes() == expected_pubkey
 

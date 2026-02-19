@@ -47,7 +47,7 @@ class Config(msgspec.Struct, frozen=True):
         valid_levels = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
         if self.log_level.upper() not in valid_levels:
             raise ValueError(
-                f"log_level must be one of {valid_levels}, got {self.log_level}"
+                f"log_level must be one of {valid_levels}, got {self.log_level}",
             )
 
         # Validate TLS configuration
@@ -55,7 +55,7 @@ class Config(msgspec.Struct, frozen=True):
         has_key = self.tls_key is not None
         if has_cert != has_key:
             raise ValueError(
-                "Both tls_cert and tls_key must be provided together, or neither"
+                "Both tls_cert and tls_key must be provided together, or neither",
             )
 
         if self.tls_cert is not None and not self.tls_cert.exists():
@@ -67,48 +67,48 @@ class Config(msgspec.Struct, frozen=True):
         # Validate metrics port
         if self.metrics_port < 1 or self.metrics_port > 65535:
             raise ValueError(
-                f"metrics_port must be between 1 and 65535, got {self.metrics_port}"
+                f"metrics_port must be between 1 and 65535, got {self.metrics_port}",
             )
 
         # Validate key_store_path if provided
         if self.key_store_path is not None:
             if not self.key_store_path.exists():
                 raise ValueError(
-                    f"key_store_path does not exist: {self.key_store_path}"
+                    f"key_store_path does not exist: {self.key_store_path}",
                 )
             if not self.key_store_path.is_dir():
                 raise ValueError(
-                    f"key_store_path must be a directory: {self.key_store_path}"
+                    f"key_store_path must be a directory: {self.key_store_path}",
                 )
 
         # Validate input-only keystore paths
         if self.keystores_path is not None and self.keystores_passwords_path is None:
             raise ValueError(
-                "--keystores-passwords-path must be provided when --keystores-path is set"
+                "--keystores-passwords-path must be provided when --keystores-path is set",
             )
         if self.keystores_passwords_path is not None and self.keystores_path is None:
             raise ValueError(
-                "--keystores-path must be provided when --keystores-passwords-path is set"
+                "--keystores-path must be provided when --keystores-passwords-path is set",
             )
 
         if self.keystores_path is not None:
             if not self.keystores_path.exists():
                 raise ValueError(
-                    f"keystores_path does not exist: {self.keystores_path}"
+                    f"keystores_path does not exist: {self.keystores_path}",
                 )
             if not self.keystores_path.is_dir():
                 raise ValueError(
-                    f"keystores_path must be a directory: {self.keystores_path}"
+                    f"keystores_path must be a directory: {self.keystores_path}",
                 )
 
         if self.keystores_passwords_path is not None:
             if not self.keystores_passwords_path.exists():
                 raise ValueError(
-                    f"keystores_passwords_path does not exist: {self.keystores_passwords_path}"
+                    f"keystores_passwords_path does not exist: {self.keystores_passwords_path}",
                 )
             if not self.keystores_passwords_path.is_dir():
                 raise ValueError(
-                    f"keystores_passwords_path must be a directory: {self.keystores_passwords_path}"
+                    f"keystores_passwords_path must be a directory: {self.keystores_passwords_path}",
                 )
 
         # Validate workers
@@ -129,16 +129,28 @@ def get_config() -> Config:
     )
 
     parser.add_argument(
-        "--host", default="127.0.0.1", help="HTTP server host (default: 127.0.0.1)"
+        "--host",
+        default="127.0.0.1",
+        help="HTTP server host (default: 127.0.0.1)",
     )
     parser.add_argument(
-        "-p", "--port", type=int, default=8080, help="HTTP server port (default: 8080)"
+        "-p",
+        "--port",
+        type=int,
+        default=8080,
+        help="HTTP server port (default: 8080)",
     )
     parser.add_argument(
-        "--tls-cert", type=Path, default=None, help="Path to TLS certificate file"
+        "--tls-cert",
+        type=Path,
+        default=None,
+        help="Path to TLS certificate file",
     )
     parser.add_argument(
-        "--tls-key", type=Path, default=None, help="Path to TLS private key file"
+        "--tls-key",
+        type=Path,
+        default=None,
+        help="Path to TLS private key file",
     )
     parser.add_argument(
         "--log-level",
@@ -147,7 +159,9 @@ def get_config() -> Config:
         help="Logging level (default: INFO)",
     )
     parser.add_argument(
-        "--auth-token", default=None, help="Bearer token for API authentication"
+        "--auth-token",
+        default=None,
+        help="Bearer token for API authentication",
     )
     parser.add_argument(
         "--metrics-port",

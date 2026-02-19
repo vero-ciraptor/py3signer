@@ -22,6 +22,7 @@ def scan_keystore_directory(directory: Path) -> dict[str, Path]:
 
     Returns:
         Dict mapping base name to keystore JSON file path
+
     """
     keystores: dict[str, Path] = {}
 
@@ -42,7 +43,7 @@ def scan_keystore_directory(directory: Path) -> dict[str, Path]:
             keystores[base_name] = json_file
         else:
             logger.warning(
-                f"Skipping {json_file.name}: no matching password file {password_file.name}"
+                f"Skipping {json_file.name}: no matching password file {password_file.name}",
             )
 
     logger.info(f"Found {len(keystores)} keystore(s) with matching password files")
@@ -50,7 +51,8 @@ def scan_keystore_directory(directory: Path) -> dict[str, Path]:
 
 
 def load_keystore_with_password(
-    keystore_path: Path, password_path: Path
+    keystore_path: Path,
+    password_path: Path,
 ) -> tuple[PublicKey, SecretKey, str, str | None]:
     """Load a single keystore with its password.
 
@@ -63,6 +65,7 @@ def load_keystore_with_password(
 
     Raises:
         KeystoreError: If keystore is invalid or password is incorrect
+
     """
     # Load keystore
     keystore = Keystore.from_file(keystore_path)
@@ -81,7 +84,9 @@ def load_keystore_with_password(
 
 
 def load_keystores_from_directory(
-    directory: Path, storage: KeyStorage, persistent: bool = True
+    directory: Path,
+    storage: KeyStorage,
+    persistent: bool = True,
 ) -> tuple[int, int]:
     """Load all keystores from a directory into storage.
 
@@ -95,6 +100,7 @@ def load_keystores_from_directory(
 
     Returns:
         Tuple of (success_count, failure_count)
+
     """
     keystores = scan_keystore_directory(directory)
 
@@ -106,10 +112,15 @@ def load_keystores_from_directory(
 
         try:
             pubkey, secret_key, path, description = load_keystore_with_password(
-                keystore_path, password_path
+                keystore_path,
+                password_path,
             )
             storage.add_key(
-                pubkey, secret_key, path, description, persistent=persistent
+                pubkey,
+                secret_key,
+                path,
+                description,
+                persistent=persistent,
             )
             logger.info(f"Loaded keystore: {base_name} (persistent={persistent})")
             success_count += 1
@@ -124,13 +135,15 @@ def load_keystores_from_directory(
             failure_count += 1
 
     logger.info(
-        f"Bulk loading complete: {success_count} succeeded, {failure_count} failed"
+        f"Bulk loading complete: {success_count} succeeded, {failure_count} failed",
     )
     return success_count, failure_count
 
 
 def load_input_only_keystores(
-    keystores_path: Path, passwords_path: Path, storage: KeyStorage
+    keystores_path: Path,
+    passwords_path: Path,
+    storage: KeyStorage,
 ) -> tuple[int, int]:
     """Load input-only keystores from separate directories.
 
@@ -147,6 +160,7 @@ def load_input_only_keystores(
 
     Raises:
         ValueError: If either path is not a valid directory
+
     """
     if not keystores_path.exists():
         raise ValueError(f"Keystores path does not exist: {keystores_path}")
@@ -167,14 +181,15 @@ def load_input_only_keystores(
 
         if not password_file.exists():
             logger.warning(
-                f"Skipping {json_file.name}: no matching password file in {passwords_path}"
+                f"Skipping {json_file.name}: no matching password file in {passwords_path}",
             )
             failure_count += 1
             continue
 
         try:
             pubkey, secret_key, path, description = load_keystore_with_password(
-                json_file, password_file
+                json_file,
+                password_file,
             )
             # Mark as non-persistent (input-only)
             storage.add_key(pubkey, secret_key, path, description, persistent=False)
@@ -191,6 +206,6 @@ def load_input_only_keystores(
             failure_count += 1
 
     logger.info(
-        f"Input-only keystore loading complete: {success_count} succeeded, {failure_count} failed"
+        f"Input-only keystore loading complete: {success_count} succeeded, {failure_count} failed",
     )
     return success_count, failure_count

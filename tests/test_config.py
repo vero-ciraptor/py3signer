@@ -24,7 +24,8 @@ class TestKeystoresPathConfig:
         passwords_dir.mkdir()
 
         config = Config(
-            keystores_path=keystores_dir, keystores_passwords_path=passwords_dir
+            keystores_path=keystores_dir,
+            keystores_passwords_path=passwords_dir,
         )
         assert config.keystores_path == keystores_dir
         assert config.keystores_passwords_path == passwords_dir
@@ -35,7 +36,8 @@ class TestKeystoresPathConfig:
         keystores_dir.mkdir()
 
         with pytest.raises(
-            ValueError, match="--keystores-passwords-path must be provided"
+            ValueError,
+            match="--keystores-passwords-path must be provided",
         ):
             Config(keystores_path=keystores_dir, keystores_passwords_path=None)
 
@@ -92,7 +94,8 @@ class TestKeystoresPathConfig:
         passwords_file.write_text("not a directory")
 
         with pytest.raises(
-            ValueError, match="keystores_passwords_path must be a directory"
+            ValueError,
+            match="keystores_passwords_path must be a directory",
         ):
             Config(
                 keystores_path=keystores_dir,
@@ -219,7 +222,8 @@ class TestTLSConfig:
         cert_file.write_text("cert content")
 
         with pytest.raises(
-            ValueError, match="Both tls_cert and tls_key must be provided"
+            ValueError,
+            match="Both tls_cert and tls_key must be provided",
         ):
             Config(tls_cert=cert_file, tls_key=None)
 
@@ -229,7 +233,8 @@ class TestTLSConfig:
         key_file.write_text("key content")
 
         with pytest.raises(
-            ValueError, match="Both tls_cert and tls_key must be provided"
+            ValueError,
+            match="Both tls_cert and tls_key must be provided",
         ):
             Config(tls_cert=None, tls_key=key_file)
 

@@ -3,8 +3,6 @@
 This module provides BLS signature functionality and EIP-2335 keystore handling.
 """
 
-from __future__ import annotations
-
 class SecretKey:
     """BLS12-381 secret key for signing operations."""
 
@@ -20,24 +18,24 @@ class SecretKey:
 
         Raises:
             ValueError: If data is not exactly 32 bytes or invalid
+
         """
-        ...
 
     def to_bytes(self) -> bytes:
         """Serialize the secret key to 32 bytes.
 
         Returns:
             32 bytes representing the secret key
+
         """
-        ...
 
     def public_key(self) -> PublicKey:
         """Get the corresponding public key.
 
         Returns:
             The PublicKey derived from this secret key
+
         """
-        ...
 
     def sign(self, message: bytes, domain: bytes) -> Signature:
         """Sign a message with this secret key.
@@ -48,8 +46,8 @@ class SecretKey:
 
         Returns:
             The BLS signature
+
         """
-        ...
 
 class PublicKey:
     """BLS12-381 public key for verification operations."""
@@ -66,16 +64,16 @@ class PublicKey:
 
         Raises:
             ValueError: If data is not exactly 48 bytes or invalid
+
         """
-        ...
 
     def to_bytes(self) -> bytes:
         """Serialize the public key to 48 bytes (compressed G1 point).
 
         Returns:
             48 bytes representing the compressed public key
+
         """
-        ...
 
 class Signature:
     """BLS12-381 signature."""
@@ -92,16 +90,16 @@ class Signature:
 
         Raises:
             ValueError: If data is not exactly 96 bytes or invalid
+
         """
-        ...
 
     def to_bytes(self) -> bytes:
         """Serialize the signature to 96 bytes (compressed G2 point).
 
         Returns:
             96 bytes representing the compressed signature
+
         """
-        ...
 
 def sign(secret_key: SecretKey, message: bytes, domain: bytes) -> Signature:
     """Sign a message with a secret key and domain.
@@ -116,8 +114,8 @@ def sign(secret_key: SecretKey, message: bytes, domain: bytes) -> Signature:
 
     Returns:
         The BLS signature
+
     """
-    ...
 
 def verify(
     public_key: PublicKey,
@@ -138,8 +136,8 @@ def verify(
 
     Returns:
         True if the signature is valid, False otherwise
+
     """
-    ...
 
 def generate_random_key() -> SecretKey:
     """Generate a random secret key (for testing).
@@ -151,8 +149,8 @@ def generate_random_key() -> SecretKey:
 
     Raises:
         RuntimeError: If failed to generate a valid key after 100 attempts
+
     """
-    ...
 
 def decrypt_keystore(keystore_json: str, password: str) -> bytes:
     """Decrypt an EIP-2335 keystore and return the secret key bytes.
@@ -170,5 +168,5 @@ def decrypt_keystore(keystore_json: str, password: str) -> bytes:
     Raises:
         ValueError: If the keystore JSON is invalid, password is incorrect,
                     or decryption fails
+
     """
-    ...

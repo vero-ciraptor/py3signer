@@ -73,7 +73,9 @@ class TestForkInfo:
     def test_fork_creation(self) -> None:
         """Test creating a Fork struct."""
         fork = Fork(
-            previous_version="0x00000000", current_version="0x01000000", epoch="100"
+            previous_version="0x00000000",
+            current_version="0x01000000",
+            epoch="100",
         )
         assert fork.previous_version == "0x00000000"
         assert fork.current_version == "0x01000000"
@@ -82,7 +84,9 @@ class TestForkInfo:
     def test_fork_info_creation(self) -> None:
         """Test creating a ForkInfo struct."""
         fork = Fork(
-            previous_version="0x00000000", current_version="0x00000000", epoch="0"
+            previous_version="0x00000000",
+            current_version="0x00000000",
+            epoch="0",
         )
         fork_info = ForkInfo(fork=fork, genesis_validators_root="0x" + "00" * 32)
         assert fork_info.fork == fork
@@ -349,7 +353,8 @@ class TestGetDomainForRequest:
             ),
             signing_root="0x" + "00" * 32,
             sync_committee_message=SyncCommitteeMessageData(
-                slot="100", beacon_block_root="0x0"
+                slot="100",
+                beacon_block_root="0x0",
             ),
         )
         assert get_domain_for_request(request) == DOMAIN_SYNC_COMMITTEE
@@ -363,7 +368,8 @@ class TestGetDomainForRequest:
             ),
             signing_root="0x" + "00" * 32,
             sync_aggregator_selection_data=SyncAggregatorSelectionData(
-                slot="100", subcommittee_index="0"
+                slot="100",
+                subcommittee_index="0",
             ),
         )
         assert get_domain_for_request(request) == DOMAIN_SYNC_COMMITTEE_SELECTION_PROOF
@@ -464,7 +470,7 @@ class TestAllSigningTypes:
                     "aggregator_index": "1",
                     "aggregate": {},
                     "selection_proof": "0x0",
-                }
+                },
             },
             "AGGREGATE_AND_PROOF_V2": {"aggregate_and_proof": {}},
             "ATTESTATION": {
@@ -474,7 +480,7 @@ class TestAllSigningTypes:
                     "beacon_block_root": "0x0",
                     "source": {},
                     "target": {},
-                }
+                },
             },
             "BLOCK": {"block": {}},
             "BLOCK_V2": {"beacon_block": {}},
@@ -484,30 +490,30 @@ class TestAllSigningTypes:
                     "withdrawal_credentials": "0x0",
                     "amount": "32000000000",
                     "genesis_fork_version": "0x0",
-                }
+                },
             },
             "RANDAO_REVEAL": {"randao_reveal": {"epoch": "1"}},
             "VOLUNTARY_EXIT": {
-                "voluntary_exit": {"epoch": "1", "validator_index": "0"}
+                "voluntary_exit": {"epoch": "1", "validator_index": "0"},
             },
             "SYNC_COMMITTEE_MESSAGE": {
                 "sync_committee_message": {
                     "slot": "1",
                     "beacon_block_root": "0x0",
-                }
+                },
             },
             "SYNC_COMMITTEE_SELECTION_PROOF": {
                 "sync_aggregator_selection_data": {
                     "slot": "1",
                     "subcommittee_index": "0",
-                }
+                },
             },
             "SYNC_COMMITTEE_CONTRIBUTION_AND_PROOF": {
                 "contribution_and_proof": {
                     "aggregator_index": "1",
                     "contribution": {},
                     "selection_proof": "0x0",
-                }
+                },
             },
             "VALIDATOR_REGISTRATION": {
                 "validator_registration": {
@@ -515,7 +521,7 @@ class TestAllSigningTypes:
                     "gas_limit": "30000000",
                     "timestamp": "1",
                     "pubkey": "0x0",
-                }
+                },
             },
         }
 
