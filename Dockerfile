@@ -64,7 +64,7 @@ COPY --from=builder /build/dist/*.whl /tmp/
 
 # Create virtual environment, install dependencies, clean up, and create cache directory
 RUN uv venv && \
-    uv pip install /tmp/*.whl "litestar[standard]>=2.15.0" "granian>=2.0.0" "msgspec>=0.19.0" "prometheus-client>=0.21.0" "pycryptodome>=3.23.0" && \
+    uv pip install /tmp/*.whl "litestar[standard]>=2.15.0" "granian>=2.0.0" "msgspec>=0.19.0" "prometheus-client>=0.21.0" && \
     rm /tmp/*.whl && \
     mkdir -p /app/.cache/uv && chown -R py3signer:py3signer /app/.cache
 

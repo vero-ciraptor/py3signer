@@ -64,11 +64,13 @@ def create_app(
         route_handlers=get_routers(),
         lifespan=[lifespan],
         debug=False,
-        state=State({
-            "storage": storage,
-            "signer": signer,
-            "auth_token": auth_token,
-        }),
+        state=State(
+            {
+                "storage": storage,
+                "signer": signer,
+                "auth_token": auth_token,
+            }
+        ),
     )
 
     return app
