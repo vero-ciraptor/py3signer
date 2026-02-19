@@ -24,8 +24,8 @@ from prometheus_client import (
 )
 
 if TYPE_CHECKING:
-    from socketserver import ThreadingMixIn
-    from wsgiref.types import WSGIApplication
+    from http.server import ThreadingHTTPServer
+    from wsgiref.simple_server import WSGIServer
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +137,7 @@ class MetricsServer:
     def __init__(self, host: str = "127.0.0.1", port: int = 8081) -> None:
         self._host = host
         self._port = port
-        self._httpd: ThreadingMixIn | None = None
+        self._httpd: WSGIServer | ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
 
     def start(self) -> None:
@@ -159,11 +159,13 @@ class MetricsServer:
     def _run_server(self) -> None:
         """Run the HTTP server (called in background thread)."""
         try:
-            self._httpd = start_http_server(
+            # start_http_server returns a tuple of (server, thread)
+            server, _ = start_http_server(
                 port=self._port,
                 addr=self._host,
                 registry=REGISTRY,
             )
+            self._httpd = server
         except Exception:
             logger.exception("Failed to start metrics server")
             raise

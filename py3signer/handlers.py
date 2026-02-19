@@ -288,12 +288,18 @@ class RemoteKeysController(Controller):  # type: ignore[misc]
     path = "/eth/v1/remotekeys"
 
     @get()  # type: ignore[untyped-decorator]
-    async def list_remote_keys(self, request: Request) -> Response[dict[str, Any]]:
+    async def list_remote_keys(
+        self,
+        request: Request,  # noqa: ARG002
+    ) -> Response[dict[str, Any]]:
         """GET /eth/v1/remotekeys - List remote keys (stub)."""
         return Response(content={"data": []}, status_code=HTTP_200_OK)
 
     @post()  # type: ignore[untyped-decorator]
-    async def add_remote_keys(self, request: Request) -> Response[dict[str, Any]]:
+    async def add_remote_keys(
+        self,
+        request: Request,  # noqa: ARG002
+    ) -> Response[dict[str, Any]]:
         """POST /eth/v1/remotekeys - Add remote keys (stub)."""
         return Response(
             content={"data": [], "message": "Remote keys not supported"},
@@ -301,7 +307,10 @@ class RemoteKeysController(Controller):  # type: ignore[misc]
         )
 
     @delete(status_code=HTTP_501_NOT_IMPLEMENTED)  # type: ignore[untyped-decorator]
-    async def delete_remote_keys(self, request: Request) -> Response[dict[str, Any]]:
+    async def delete_remote_keys(
+        self,
+        request: Request,  # noqa: ARG002
+    ) -> Response[dict[str, Any]]:
         """DELETE /eth/v1/remotekeys - Delete remote keys (stub)."""
         return Response(
             content={"data": [], "message": "Remote keys not supported"},
@@ -378,13 +387,12 @@ class SigningController(Controller):  # type: ignore[misc]
                     status_code=HTTP_200_OK,
                     media_type="text/plain",
                 )
-            else:
-                # Default: return JSON (for application/json, */*, or missing header)
-                return Response(
-                    content={"signature": full_signature},
-                    status_code=HTTP_200_OK,
-                    media_type="application/json",
-                )
+            # Default: return JSON (for application/json, */*, or missing header)
+            return Response(
+                content={"signature": full_signature},
+                status_code=HTTP_200_OK,
+                media_type="application/json",
+            )
         except SignerError as e:
             raise NotFoundException(detail=str(e)) from e
         except Exception as e:

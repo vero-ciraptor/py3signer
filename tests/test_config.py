@@ -1,7 +1,6 @@
 """Tests for configuration management."""
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 
@@ -43,18 +42,26 @@ class TestKeystoresPathConfig:
             match="--keystores-passwords-path must be provided",
         ) as exc_info:
             Config(keystores_path=keystores_dir, keystores_passwords_path=None)
-        
-        assert str(keystores_dir) in str(exc_info.value) or "passwords-path" in str(exc_info.value).lower()
+
+        assert (
+            str(keystores_dir) in str(exc_info.value)
+            or "passwords-path" in str(exc_info.value).lower()
+        )
 
     def test_only_passwords_path_raises(self, tmp_path: Path) -> None:
         """Test that only passwords_path without keystores_path raises error."""
         passwords_dir = tmp_path / "passwords"
         passwords_dir.mkdir()
 
-        with pytest.raises(ValueError, match="--keystores-path must be provided") as exc_info:
+        with pytest.raises(
+            ValueError, match="--keystores-path must be provided"
+        ) as exc_info:
             Config(keystores_path=None, keystores_passwords_path=passwords_dir)
-        
-        assert "keystores-path" in str(exc_info.value).lower() or "path" in str(exc_info.value).lower()
+
+        assert (
+            "keystores-path" in str(exc_info.value).lower()
+            or "path" in str(exc_info.value).lower()
+        )
 
     def test_keystores_path_not_exists(self, tmp_path: Path) -> None:
         """Test error when keystores_path does not exist."""
@@ -62,12 +69,14 @@ class TestKeystoresPathConfig:
         passwords_dir = tmp_path / "passwords"
         passwords_dir.mkdir()
 
-        with pytest.raises(ValueError, match="keystores_path does not exist") as exc_info:
+        with pytest.raises(
+            ValueError, match="keystores_path does not exist"
+        ) as exc_info:
             Config(
                 keystores_path=keystores_dir,
                 keystores_passwords_path=passwords_dir,
             )
-        
+
         assert str(keystores_dir) in str(exc_info.value)
 
     def test_passwords_path_not_exists(self, tmp_path: Path) -> None:
@@ -76,12 +85,14 @@ class TestKeystoresPathConfig:
         passwords_dir = tmp_path / "passwords"
         keystores_dir.mkdir()
 
-        with pytest.raises(ValueError, match="keystores_passwords_path does not exist") as exc_info:
+        with pytest.raises(
+            ValueError, match="keystores_passwords_path does not exist"
+        ) as exc_info:
             Config(
                 keystores_path=keystores_dir,
                 keystores_passwords_path=passwords_dir,
             )
-        
+
         assert str(passwords_dir) in str(exc_info.value)
 
     def test_keystores_path_not_directory(self, tmp_path: Path) -> None:
@@ -91,12 +102,14 @@ class TestKeystoresPathConfig:
         keystores_file.write_text("not a directory")
         passwords_dir.mkdir()
 
-        with pytest.raises(ValueError, match="keystores_path must be a directory") as exc_info:
+        with pytest.raises(
+            ValueError, match="keystores_path must be a directory"
+        ) as exc_info:
             Config(
                 keystores_path=keystores_file,
                 keystores_passwords_path=passwords_dir,
             )
-        
+
         assert str(keystores_file) in str(exc_info.value)
 
     def test_passwords_path_not_directory(self, tmp_path: Path) -> None:
@@ -114,7 +127,7 @@ class TestKeystoresPathConfig:
                 keystores_path=keystores_dir,
                 keystores_passwords_path=passwords_file,
             )
-        
+
         assert str(passwords_file) in str(exc_info.value)
 
 
@@ -139,9 +152,11 @@ class TestKeyStorePathConfig:
         """Test error when key_store_path does not exist."""
         keystore_dir = tmp_path / "keystores"
 
-        with pytest.raises(ValueError, match="key_store_path does not exist") as exc_info:
+        with pytest.raises(
+            ValueError, match="key_store_path does not exist"
+        ) as exc_info:
             Config(key_store_path=keystore_dir)
-        
+
         assert str(keystore_dir) in str(exc_info.value)
 
     def test_key_store_path_not_directory(self, tmp_path: Path) -> None:
@@ -149,9 +164,11 @@ class TestKeyStorePathConfig:
         keystore_file = tmp_path / "keystores"
         keystore_file.write_text("not a directory")
 
-        with pytest.raises(ValueError, match="key_store_path must be a directory") as exc_info:
+        with pytest.raises(
+            ValueError, match="key_store_path must be a directory"
+        ) as exc_info:
             Config(key_store_path=keystore_file)
-        
+
         assert str(keystore_file) in str(exc_info.value)
 
 
@@ -200,7 +217,7 @@ class TestConfigDefaults:
     def test_all_defaults(self) -> None:
         """Test all default configuration values."""
         config = Config()
-        
+
         assert config.host == "127.0.0.1"
         assert config.port == 8080
         assert config.log_level == "INFO"
@@ -220,11 +237,11 @@ class TestPortConfig:
         """Test that valid ports are accepted."""
         config = Config(port=8080)
         assert config.port == 8080
-        
+
         # Test boundary values
         config_min = Config(port=1)
         assert config_min.port == 1
-        
+
         config_max = Config(port=65535)
         assert config_max.port == 65535
 
@@ -232,7 +249,7 @@ class TestPortConfig:
         """Test error when port is too low."""
         with pytest.raises(ValueError, match="port must be between") as exc_info:
             Config(port=0)
-        
+
         assert "0" in str(exc_info.value)
         assert "1" in str(exc_info.value)  # Should mention valid range
 
@@ -240,7 +257,7 @@ class TestPortConfig:
         """Test error when port is too high."""
         with pytest.raises(ValueError, match="port must be between") as exc_info:
             Config(port=65536)
-        
+
         assert "65536" in str(exc_info.value) or "65535" in str(exc_info.value)
 
 
@@ -258,33 +275,37 @@ class TestMetricsPortConfig:
         """Test that valid metrics ports are accepted."""
         config = Config(metrics_port=9090)
         assert config.metrics_port == 9090
-        
+
         # Test boundary values
         config_min = Config(metrics_port=1)
         assert config_min.metrics_port == 1
-        
+
         config_max = Config(metrics_port=65535)
         assert config_max.metrics_port == 65535
 
     def test_metrics_port_too_low(self) -> None:
         """Test error when metrics port is too low."""
-        with pytest.raises(ValueError, match="metrics_port must be between") as exc_info:
+        with pytest.raises(
+            ValueError, match="metrics_port must be between"
+        ) as exc_info:
             Config(metrics_port=0)
-        
+
         assert "0" in str(exc_info.value)
 
     def test_metrics_port_too_high(self) -> None:
         """Test error when metrics port is too high."""
-        with pytest.raises(ValueError, match="metrics_port must be between") as exc_info:
+        with pytest.raises(
+            ValueError, match="metrics_port must be between"
+        ) as exc_info:
             Config(metrics_port=65536)
-        
+
         assert "65536" in str(exc_info.value) or "65535" in str(exc_info.value)
 
     def test_custom_metrics_host(self) -> None:
         """Test that custom metrics host can be set."""
         config = Config(metrics_host="0.0.0.0")
         assert config.metrics_host == "0.0.0.0"
-        
+
         config2 = Config(metrics_host="192.168.1.1")
         assert config2.metrics_host == "192.168.1.1"
 
@@ -314,7 +335,7 @@ class TestLogLevelConfig:
         """Test error when log level is invalid."""
         with pytest.raises(ValueError, match="log_level must be one of") as exc_info:
             Config(log_level="INVALID")
-        
+
         assert "INVALID" in str(exc_info.value)
         # Should list valid options
         assert "DEBUG" in str(exc_info.value) or "INFO" in str(exc_info.value)
@@ -344,12 +365,12 @@ class TestWorkersConfig:
         """Test error when workers is less than 1."""
         with pytest.raises(ValueError, match="workers must be at least 1") as exc_info:
             Config(workers=0)
-        
+
         assert "0" in str(exc_info.value)
 
     def test_workers_negative(self) -> None:
         """Test error when workers is negative."""
         with pytest.raises(ValueError, match="workers must be at least 1") as exc_info:
             Config(workers=-1)
-        
+
         assert "-1" in str(exc_info.value)

@@ -29,8 +29,11 @@ class TestKeystore:
         """Test loading invalid JSON."""
         with pytest.raises(msgspec.DecodeError, match="JSON is malformed") as exc_info:
             Keystore.from_json("not valid json")
-        
-        assert "malformed" in str(exc_info.value).lower() or "json" in str(exc_info.value).lower()
+
+        assert (
+            "malformed" in str(exc_info.value).lower()
+            or "json" in str(exc_info.value).lower()
+        )
 
     def test_missing_required_field(self) -> None:
         """Test validation of required fields."""
@@ -39,10 +42,13 @@ class TestKeystore:
         # msgspec.Struct raises TypeError for missing required fields
         with pytest.raises((KeystoreError, TypeError)) as exc_info:
             Keystore(**incomplete)
-        
+
         # Should mention missing required field
         error_str = str(exc_info.value).lower()
-        assert any(field in error_str for field in ["pubkey", "path", "uuid", "required", "missing"])
+        assert any(
+            field in error_str
+            for field in ["pubkey", "path", "uuid", "required", "missing"]
+        )
 
     def test_invalid_crypto_structure(self) -> None:
         """Test validation of crypto structure."""
@@ -99,9 +105,10 @@ class TestKeystore:
     def test_keystore_from_file_not_found(self) -> None:
         """Test loading keystore from non-existent file."""
         from pathlib import Path
+
         non_existent_path = Path("/non/existent/path/keystore.json")
-        
-        with pytest.raises((FileNotFoundError, OSError)) as exc_info:
+
+        with pytest.raises((FileNotFoundError, OSError)):
             Keystore.from_file(non_existent_path)
 
     def test_unsupported_version(self) -> None:
@@ -110,7 +117,13 @@ class TestKeystore:
             "crypto": {
                 "kdf": {
                     "function": "scrypt",
-                    "params": {"dklen": 32, "n": 262144, "p": 1, "r": 8, "salt": "aa" * 32},
+                    "params": {
+                        "dklen": 32,
+                        "n": 262144,
+                        "p": 1,
+                        "r": 8,
+                        "salt": "aa" * 32,
+                    },
                     "message": "",
                 },
                 "checksum": {"function": "sha256", "params": {}, "message": "aa" * 32},
@@ -128,9 +141,11 @@ class TestKeystore:
 
         with pytest.raises(KeystoreError) as exc_info:
             Keystore(**keystore_data)
-        
+
         assert "version" in str(exc_info.value).lower()
-        assert "not supported" in str(exc_info.value).lower() or "4" in str(exc_info.value)
+        assert "not supported" in str(exc_info.value).lower() or "4" in str(
+            exc_info.value
+        )
 
 
 class TestKeystoreDecryption:
@@ -257,7 +272,9 @@ class TestKeystoreDecryptionV4:
         # This test documents that whitespace is stripped
         try:
             # The actual password file has the password on first line
-            password_content = (Path(__file__).parent / "data" / "keystore_valid_2.txt").read_text()
+            password_content = (
+                Path(__file__).parent / "data" / "keystore_valid_2.txt"
+            ).read_text()
             password = password_content.strip()
             secret_key = keystore.decrypt(password)
             assert secret_key is not None
@@ -276,7 +293,7 @@ class TestKeystoreEdgeCases:
 
         with pytest.raises(KeystoreError) as exc_info:
             ks.decrypt("")
-        
+
         error_msg = str(exc_info.value).lower()
         assert "password" in error_msg or "invalid" in error_msg
 

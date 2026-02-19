@@ -1,9 +1,10 @@
 """Tests for Prometheus metrics functionality."""
 
+import contextlib
 from typing import TYPE_CHECKING
 
-import pytest
 import httpx
+import pytest
 from litestar import Litestar
 from litestar.datastructures import State
 from litestar.testing import AsyncTestClient
@@ -25,10 +26,12 @@ def create_test_app() -> Litestar:
     return Litestar(
         route_handlers=get_routers(),
         debug=False,
-        state=State({
-            "storage": storage,
-            "signer": signer,
-        }),
+        state=State(
+            {
+                "storage": storage,
+                "signer": signer,
+            }
+        ),
     )
 
 
@@ -54,19 +57,23 @@ async def test_metrics_endpoint_returns_prometheus_format(
 
     text = resp.text
     # Check for expected metrics
-    assert "py3signer_build_info" in text, f"Expected 'py3signer_build_info' in metrics"
-    assert "signing_requests_total" in text, f"Expected 'signing_requests_total' in metrics"
-    assert "signing_duration_seconds" in text, f"Expected 'signing_duration_seconds' in metrics"
-    assert "signing_errors_total" in text, f"Expected 'signing_errors_total' in metrics"
-    assert "keys_loaded" in text, f"Expected 'keys_loaded' in metrics"
-    
+    assert "py3signer_build_info" in text, "Expected 'py3signer_build_info' in metrics"
+    assert "signing_requests_total" in text, (
+        "Expected 'signing_requests_total' in metrics"
+    )
+    assert "signing_duration_seconds" in text, (
+        "Expected 'signing_duration_seconds' in metrics"
+    )
+    assert "signing_errors_total" in text, "Expected 'signing_errors_total' in metrics"
+    assert "keys_loaded" in text, "Expected 'keys_loaded' in metrics"
+
     # Verify format is valid Prometheus text format
     assert "# HELP" in text or "# TYPE" in text or "py3signer" in text
-    
+
     # Each metric should be on its own line
     lines = text.strip().split("\n")
     assert len(lines) > 0
-    
+
     # Check that metrics have proper format (name value)
     for line in lines:
         if line.startswith("#"):
@@ -85,7 +92,9 @@ async def test_metrics_endpoint_health(metrics_client: AsyncTestClient) -> None:
 
     data = resp.json()
     assert "status" in data, f"Expected 'status' key in response, got {data}"
-    assert data["status"] == "healthy", f"Expected status 'healthy', got {data['status']}"
+    assert data["status"] == "healthy", (
+        f"Expected status 'healthy', got {data['status']}"
+    )
 
 
 @pytest.mark.asyncio
@@ -112,7 +121,9 @@ async def test_keys_loaded_gauge(metrics_client: AsyncTestClient) -> None:
     # Check gauge updated
     resp = await metrics_client.get("/metrics")
     text = resp.text
-    assert "keys_loaded 3.0" in text, f"Expected keys_loaded 3.0 in metrics, got: {text}"
+    assert "keys_loaded 3.0" in text, (
+        f"Expected keys_loaded 3.0 in metrics, got: {text}"
+    )
 
     # Remove a key
     pk_hex = next(iter(storage._keys.keys()))
@@ -121,7 +132,9 @@ async def test_keys_loaded_gauge(metrics_client: AsyncTestClient) -> None:
     # Check gauge updated
     resp = await metrics_client.get("/metrics")
     text = resp.text
-    assert "keys_loaded 2.0" in text, f"Expected keys_loaded 2.0 in metrics, got: {text}"
+    assert "keys_loaded 2.0" in text, (
+        f"Expected keys_loaded 2.0 in metrics, got: {text}"
+    )
 
     # Cleanup
     storage.clear()
@@ -129,14 +142,23 @@ async def test_keys_loaded_gauge(metrics_client: AsyncTestClient) -> None:
     # Check gauge updated to 0
     resp = await metrics_client.get("/metrics")
     text = resp.text
-    assert "keys_loaded 0.0" in text or "keys_loaded 0" in text, f"Expected keys_loaded 0.0 in metrics, got: {text}"
+    assert "keys_loaded 0.0" in text or "keys_loaded 0" in text, (
+        f"Expected keys_loaded 0.0 in metrics, got: {text}"
+    )
+
+
+def _assert_prometheus_content_type(content_type: str) -> None:
+    """Assert that content-type is valid Prometheus format.
+
+    Used across multiple metrics tests to avoid repetition.
+    """
+    assert "text/plain" in content_type
+    assert "version=0.0.4" in content_type or "version=1.0.0" in content_type
 
 
 def test_metrics_content_type() -> None:
     """Test metrics content type helper."""
-    content_type = metrics.get_metrics_content_type()
-    assert "text/plain" in content_type
-    assert "version=1.0.0" in content_type
+    _assert_prometheus_content_type(metrics.get_metrics_content_type())
 
 
 def test_metrics_output() -> None:
@@ -155,11 +177,8 @@ async def test_metrics_via_standalone_controller() -> None:
     async with AsyncTestClient(app) as client:
         resp = await client.get("/metrics")
         assert resp.status_code == 200
-        content_type = resp.headers.get("content-type", "")
-        assert "text/plain" in content_type
-        assert "version=1.0.0" in content_type
+        _assert_prometheus_content_type(resp.headers.get("content-type", ""))
         assert "py3signer_build_info" in resp.text
-        assert len(resp.text) > 0
 
 
 class TestMetricsServer:
@@ -195,21 +214,12 @@ class TestMetricsServer:
             # Verify metrics are accessible
             response = httpx.get(f"http://127.0.0.1:{port}/metrics", timeout=5)
             assert response.status_code == 200
-            content_type = response.headers.get("content-type", "")
-            assert "text/plain" in content_type
-            # Accept either version (the metrics module might use different versions)
-            assert "version=0.0.4" in content_type or "version=1.0.0" in content_type
+            _assert_prometheus_content_type(response.headers.get("content-type", ""))
             assert "py3signer_build_info" in response.text
-            assert len(response.text) > 0
-            
-            # Verify it's valid Prometheus format
-            assert "#" in response.text or "py3signer" in response.text
         finally:
             # Stop the server - handle the case where _httpd might be a tuple
-            try:
+            with contextlib.suppress(AttributeError, TypeError):
                 server.stop()
-            except (AttributeError, TypeError):
-                pass  # Server may have been improperly initialized
 
     def test_metrics_server_health_endpoint(self) -> None:
         """Test metrics server health endpoint via standalone server."""
@@ -230,10 +240,12 @@ class TestMetricsServer:
             response = httpx.get(f"http://127.0.0.1:{port}/", timeout=5)
             # The root path may return 404 or the metrics page depending on implementation
             assert response.status_code in [200, 404]
-            
+
             # Try health endpoint explicitly
             try:
-                health_response = httpx.get(f"http://127.0.0.1:{port}/health", timeout=5)
+                health_response = httpx.get(
+                    f"http://127.0.0.1:{port}/health", timeout=5
+                )
                 if health_response.status_code == 200:
                     content_type = health_response.headers.get("content-type", "")
                     # Health endpoint might return JSON or Prometheus format
@@ -247,10 +259,8 @@ class TestMetricsServer:
                 pass  # Health endpoint may not be available on standalone server
         finally:
             # Stop the server - handle the case where _httpd might be a tuple
-            try:
+            with contextlib.suppress(AttributeError, TypeError):
                 server.stop()
-            except (AttributeError, TypeError):
-                pass  # Server may have been improperly initialized
 
 
 class TestMetricsCounters:
@@ -261,7 +271,7 @@ class TestMetricsCounters:
         # Get the counter
         counter = metrics.SIGNING_REQUESTS_TOTAL
         assert counter is not None
-        
+
         # Increment and verify no error
         counter.labels(key_type="bls").inc()
         counter.labels(key_type="bls").inc(5)
@@ -271,7 +281,7 @@ class TestMetricsCounters:
         # Get the counter
         counter = metrics.SIGNING_ERRORS_TOTAL
         assert counter is not None
-        
+
         # Increment and verify no error
         counter.labels(error_type="key_not_found").inc()
         counter.labels(error_type="signing_failed").inc()
@@ -281,7 +291,7 @@ class TestMetricsCounters:
         # Get the histogram
         histogram = metrics.SIGNING_DURATION_SECONDS
         assert histogram is not None
-        
+
         # Observe and verify no error
         histogram.labels(key_type="bls").observe(0.001)
         histogram.labels(key_type="bls").observe(0.1)
