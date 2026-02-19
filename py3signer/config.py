@@ -1,6 +1,7 @@
 """Configuration management using msgspec Struct."""
 
 import argparse
+import os
 from pathlib import Path
 
 import msgspec
@@ -100,7 +101,15 @@ class Config(msgspec.Struct, frozen=True):
 
 
 def get_config() -> Config:
-    """Parse command line arguments and return configuration."""
+    """Parse command line arguments and return configuration.
+    
+    When running under gunicorn (detected by GUNICORN_CMD_ARGS env var),
+    loads configuration from environment variables instead of CLI args.
+    """
+    # Check if running under gunicorn
+    if os.environ.get("GUNICORN_CMD_ARGS") is not None:
+        return _get_config_from_env()
+    
     parser = argparse.ArgumentParser(
         description="py3signer - A Remote BLS Signer for Ethereum",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -168,6 +177,30 @@ def get_config() -> Config:
     }
 
     # Create config from dict using msgspec convert
+    try:
+        config = msgspec.convert(config_dict, Config)
+    except msgspec.ValidationError as e:
+        raise ValueError(f"Configuration validation error: {e}")
+
+    return config
+
+
+def _get_config_from_env() -> Config:
+    """Load configuration from environment variables for gunicorn mode."""
+    config_dict: dict[str, object] = {
+        "host": os.getenv("PY3SIGNER_HOST", "0.0.0.0"),
+        "port": int(os.getenv("PY3SIGNER_PORT", "8080")),
+        "tls_cert": Path(os.environ["PY3SIGNER_TLS_CERT"]) if os.getenv("PY3SIGNER_TLS_CERT") else None,
+        "tls_key": Path(os.environ["PY3SIGNER_TLS_KEY"]) if os.getenv("PY3SIGNER_TLS_KEY") else None,
+        "log_level": os.getenv("PY3SIGNER_LOG_LEVEL", "INFO"),
+        "auth_token": os.getenv("PY3SIGNER_AUTH_TOKEN"),
+        "metrics_port": int(os.getenv("PY3SIGNER_METRICS_PORT", "8081")),
+        "metrics_host": os.getenv("PY3SIGNER_METRICS_HOST", "127.0.0.1"),
+        "key_store_path": Path(os.environ["PY3SIGNER_KEY_STORE_PATH"]) if os.getenv("PY3SIGNER_KEY_STORE_PATH") else None,
+        "keystores_path": Path(os.environ["PY3SIGNER_KEYSTORES_PATH"]) if os.getenv("PY3SIGNER_KEYSTORES_PATH") else None,
+        "keystores_passwords_path": Path(os.environ["PY3SIGNER_KEYSTORES_PASSWORDS_PATH"]) if os.getenv("PY3SIGNER_KEYSTORES_PASSWORDS_PATH") else None,
+    }
+
     try:
         config = msgspec.convert(config_dict, Config)
     except msgspec.ValidationError as e:

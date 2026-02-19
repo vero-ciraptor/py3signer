@@ -2,9 +2,13 @@
 
 This module defines and exposes all Prometheus metrics used by py3signer.
 Metrics are opt-in and only collected when --metrics-enabled is set.
+
+For multi-worker (gunicorn) deployments, set PROMETHEUS_MULTIPROC_DIR to a
+writable directory for metrics aggregation across workers.
 """
 
 import logging
+import os
 import time
 from collections.abc import Awaitable, Callable
 
@@ -19,10 +23,30 @@ from prometheus_client import (
     generate_latest,
 )
 
+# Try to import multiprocess support for gunicorn
+try:
+    from prometheus_client import multiprocess
+
+    MULTIPROC_SUPPORT = True
+except ImportError:
+    MULTIPROC_SUPPORT = False
+
 logger = logging.getLogger(__name__)
 
-# Create a dedicated registry for py3signer metrics
-REGISTRY = CollectorRegistry()
+
+def get_registry() -> CollectorRegistry:
+    """Get the appropriate registry for the current deployment mode.
+    
+    In multi-worker (gunicorn) mode with PROMETHEUS_MULTIPROC_DIR set,
+    returns a multi-process registry. Otherwise returns the default registry.
+    """
+    if MULTIPROC_SUPPORT and os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
+        return CollectorRegistry()
+    return CollectorRegistry()
+
+
+# Create the registry
+REGISTRY = get_registry()
 
 # Application info
 APP_INFO = Info(
@@ -81,6 +105,11 @@ HTTP_REQUEST_DURATION_SECONDS = Histogram(
 
 def get_metrics_output() -> bytes:
     """Generate Prometheus-formatted metrics output."""
+    # In multi-process mode, use the multiprocess collector
+    if MULTIPROC_SUPPORT and os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        return generate_latest(registry)
     return generate_latest(REGISTRY)
 
 

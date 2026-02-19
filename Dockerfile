@@ -64,9 +64,19 @@ COPY --from=builder /build/dist/*.whl /tmp/
 
 # Create virtual environment, install dependencies, clean up, and create cache directory
 RUN uv venv && \
-    uv pip install /tmp/*.whl "aiohttp>=3.11.0" "msgspec>=0.19.0" && \
+    uv pip install /tmp/*.whl "aiohttp>=3.11.0" "msgspec>=0.19.0" "gunicorn>=23.0.0" && \
     rm /tmp/*.whl && \
     mkdir -p /app/.cache/uv && chown -R py3signer:py3signer /app/.cache
+
+# Copy entrypoint script
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
+
+# Copy gunicorn config
+COPY gunicorn.conf.py .
+
+# Create prometheus multiproc directory for multi-worker metrics
+RUN mkdir -p /tmp/prometheus_multiproc && chown -R py3signer:py3signer /tmp/prometheus_multiproc
 
 # Change to non-root user
 USER py3signer
@@ -74,15 +84,15 @@ USER py3signer
 # Set uv cache directory (writable by py3signer user)
 ENV UV_CACHE_DIR=/app/.cache/uv
 
+# Set prometheus multiproc directory for multi-worker metrics
+ENV PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus_multiproc
+
 # Expose port
 EXPOSE 8080
 
-# Health check
+# Health check (gunicorn handles this via the app)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')" || exit 1
 
-# Set entrypoint using uv
-ENTRYPOINT ["uv", "run", "python", "-m", "py3signer"]
-
-# Default arguments
-CMD ["--host", "0.0.0.0", "--port", "8080"]
+# Set entrypoint
+ENTRYPOINT ["./entrypoint.sh"]
