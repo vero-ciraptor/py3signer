@@ -299,7 +299,7 @@ uv run python scripts/benchmark.py --auth-token mysecrettoken
 uv run python scripts/benchmark.py --requests 5000 --concurrency 50
 
 # Auto-import keystores from path
-uv run python scripts/benchmark.py --key-store-path ./keystores
+uv run python scripts/benchmark.py --data-dir ./keystores
 ```
 
 ### Benchmark Output
@@ -328,7 +328,7 @@ Results:
 | `--url` | Server URL | `http://localhost:8080` |
 | `--concurrency` | Number of concurrent requests | `10` |
 | `--requests` | Total number of requests | `1000` |
-| `--key-store-path` | Path to keystores for auto-loading | None |
+| `--data-dir` | Path to keystores for auto-loading | None |
 | `--auth-token` | Bearer token for authentication | None |
 | `--pubkey` | Specific public key to use for signing | None (auto-detect) |
 

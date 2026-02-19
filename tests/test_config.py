@@ -109,59 +109,59 @@ class TestKeystoresPathConfig:
             )
 
 
-class TestKeyStorePathConfig:
-    """Tests for --key-store-path configuration."""
+class TestDataDirConfig:
+    """Tests for --data-dir configuration."""
 
-    def test_key_store_path_none(self) -> None:
-        """Test that key_store_path can be None."""
+    def test_data_dir_none(self) -> None:
+        """Test that data_dir can be None."""
         config = Config()
-        assert config.key_store_path is None
+        assert config.data_dir is None
 
-    def test_key_store_path_valid(self, tmp_path: Path) -> None:
-        """Test that key_store_path can be set to a valid directory."""
+    def test_data_dir_valid(self, tmp_path: Path) -> None:
+        """Test that data_dir can be set to a valid directory."""
         keystore_dir = tmp_path / "keystores"
         keystore_dir.mkdir()
 
-        config = Config(key_store_path=keystore_dir)
-        assert config.key_store_path == keystore_dir
-        assert isinstance(config.key_store_path, Path)
+        config = Config(data_dir=keystore_dir)
+        assert config.data_dir == keystore_dir
+        assert isinstance(config.data_dir, Path)
 
-    def test_key_store_path_not_exists(self, tmp_path: Path) -> None:
-        """Test error when key_store_path does not exist."""
+    def test_data_dir_not_exists(self, tmp_path: Path) -> None:
+        """Test error when data_dir does not exist."""
         keystore_dir = tmp_path / "keystores"
 
-        expected_msg = f"key_store_path does not exist: {keystore_dir}"
+        expected_msg = f"data_dir does not exist: {keystore_dir}"
         with pytest.raises(ValueError, match=expected_msg):
-            Config(key_store_path=keystore_dir)
+            Config(data_dir=keystore_dir)
 
-    def test_key_store_path_not_directory(self, tmp_path: Path) -> None:
-        """Test error when key_store_path is not a directory."""
+    def test_data_dir_not_directory(self, tmp_path: Path) -> None:
+        """Test error when data_dir is not a directory."""
         keystore_file = tmp_path / "keystores"
         keystore_file.write_text("not a directory")
 
-        expected_msg = f"key_store_path must be a directory: {keystore_file}"
+        expected_msg = f"data_dir must be a directory: {keystore_file}"
         with pytest.raises(ValueError, match=expected_msg):
-            Config(key_store_path=keystore_file)
+            Config(data_dir=keystore_file)
 
 
 class TestCombinedKeystoreConfig:
-    """Tests for using both --key-store-path and --keystores-path together."""
+    """Tests for using both --data-dir and --keystores-path together."""
 
     def test_all_three_paths_valid(self, tmp_path: Path) -> None:
         """Test that all three paths can be used together."""
-        key_store_dir = tmp_path / "keystore_store"
+        data_dir = tmp_path / "data"
         keystores_dir = tmp_path / "keystores"
         passwords_dir = tmp_path / "passwords"
-        key_store_dir.mkdir()
+        data_dir.mkdir()
         keystores_dir.mkdir()
         passwords_dir.mkdir()
 
         config = Config(
-            key_store_path=key_store_dir,
+            data_dir=data_dir,
             keystores_path=keystores_dir,
             keystores_passwords_path=passwords_dir,
         )
-        assert config.key_store_path == key_store_dir
+        assert config.data_dir == data_dir
         assert config.keystores_path == keystores_dir
         assert config.keystores_passwords_path == passwords_dir
 
@@ -196,7 +196,7 @@ class TestConfigDefaults:
         assert config.normalized_log_level == "INFO"
         assert config.metrics_host == "127.0.0.1"
         assert config.metrics_port == 8081
-        assert config.key_store_path is None
+        assert config.data_dir is None
         assert config.keystores_path is None
         assert config.keystores_passwords_path is None
         assert config.workers >= 1

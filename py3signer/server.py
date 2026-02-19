@@ -32,16 +32,16 @@ def create_app(
     """Create and configure the Litestar application."""
     # If config is provided but storage/signer are not, create them
     if config is not None and (storage is None or signer is None):
-        storage = KeyStorage(keystore_path=config.key_store_path)
+        storage = KeyStorage(keystore_path=config.data_dir)
         signer = Signer(storage)
 
-        # Load keystores from key_store_path if configured (persistent keystores)
-        if config.key_store_path:
+        # Load keystores from data_dir if configured (persistent keystores)
+        if config.data_dir:
             success, failures = load_keystores_from_directory(
-                config.key_store_path,
+                config.data_dir,
                 storage,
             )
-            logger.info(f"Loaded {success} keystores from {config.key_store_path}")
+            logger.info(f"Loaded {success} keystores from {config.data_dir}")
             if failures > 0:
                 logger.warning(f"Failed to load {failures} keystores")
 

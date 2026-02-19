@@ -32,8 +32,8 @@ def load_config_from_env() -> Config | None:
     try:
         config_dict = json.loads(config_json)
         # Convert string paths back to Path objects
-        if config_dict.get("key_store_path"):
-            config_dict["key_store_path"] = Path(config_dict["key_store_path"])
+        if config_dict.get("data_dir"):
+            config_dict["data_dir"] = Path(config_dict["data_dir"])
         if config_dict.get("keystores_path"):
             config_dict["keystores_path"] = Path(config_dict["keystores_path"])
         if config_dict.get("keystores_passwords_path"):
@@ -54,7 +54,7 @@ def store_config_in_env(config: Config) -> None:
         "log_level": config.log_level,
         "metrics_host": config.metrics_host,
         "metrics_port": config.metrics_port,
-        "key_store_path": str(config.key_store_path) if config.key_store_path else None,
+        "data_dir": str(config.data_dir) if config.data_dir else None,
         "keystores_path": str(config.keystores_path) if config.keystores_path else None,
         "keystores_passwords_path": (
             str(config.keystores_passwords_path)

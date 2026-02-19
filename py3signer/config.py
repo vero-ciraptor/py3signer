@@ -22,7 +22,7 @@ class Config(msgspec.Struct, frozen=True):
     metrics_port: int = 8081
 
     # Keystore settings
-    key_store_path: Path | None = None
+    data_dir: Path | None = None
 
     # Input-only keystore directories (not persisted)
     keystores_path: Path | None = None
@@ -49,15 +49,15 @@ class Config(msgspec.Struct, frozen=True):
                 f"metrics_port must be between 1 and 65535, got {self.metrics_port}",
             )
 
-        # Validate key_store_path if provided
-        if self.key_store_path is not None:
-            if not self.key_store_path.exists():
+        # Validate data_dir if provided
+        if self.data_dir is not None:
+            if not self.data_dir.exists():
                 raise ValueError(
-                    f"key_store_path does not exist: {self.key_store_path}",
+                    f"data_dir does not exist: {self.data_dir}",
                 )
-            if not self.key_store_path.is_dir():
+            if not self.data_dir.is_dir():
                 raise ValueError(
-                    f"key_store_path must be a directory: {self.key_store_path}",
+                    f"data_dir must be a directory: {self.data_dir}",
                 )
 
         # Validate input-only keystore paths
@@ -137,7 +137,7 @@ def get_config() -> Config:
         help="Host for metrics server (default: 127.0.0.1)",
     )
     parser.add_argument(
-        "--key-store-path",
+        "--data-dir",
         type=Path,
         default=None,
         help="Path to directory containing keystores (matching .json files with .txt password files)",
@@ -171,7 +171,7 @@ def get_config() -> Config:
         "log_level": args.log_level,
         "metrics_port": args.metrics_port,
         "metrics_host": args.metrics_host,
-        "key_store_path": args.key_store_path,
+        "data_dir": args.data_dir,
         "keystores_path": args.keystores_path,
         "keystores_passwords_path": args.keystores_passwords_path,
         "workers": args.workers,
