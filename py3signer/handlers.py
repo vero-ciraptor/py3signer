@@ -178,11 +178,11 @@ class LocalKeyManagerController(Controller):  # type: ignore[misc]
         keys = storage.list_keys()
         keystores = [
             KeystoreInfo(
-                validating_pubkey=pubkey,
-                derivation_path=path,
-                readonly=is_external,  # External keys are readonly
+                validating_pubkey=key_info.pubkey_hex,
+                derivation_path=key_info.path,
+                readonly=key_info.is_external,  # External keys are readonly
             )
-            for pubkey, path, _, is_external in keys
+            for key_info in keys
         ]
         return Response(
             content={"data": [msgspec.to_builtins(k) for k in keystores]},
@@ -216,7 +216,7 @@ class LocalKeyManagerController(Controller):  # type: ignore[misc]
             )
 
         results = []
-        existing_keys = {k[0] for k in storage.list_keys()}
+        existing_keys = {k.pubkey_hex for k in storage.list_keys()}
         persistence_enabled = storage.managed_keystores_dir is not None
 
         for keystore_json, password in zip(
@@ -358,7 +358,7 @@ class SigningController(Controller):  # type: ignore[misc]
         """GET /api/v1/eth2/publicKeys - List available BLS public keys."""
         storage = _get_storage(request)
         keys = storage.list_keys()
-        public_keys = [f"0x{pubkey}" for pubkey, _, _, _ in keys]
+        public_keys = [f"0x{key_info.pubkey_hex}" for key_info in keys]
         return Response(content=public_keys, status_code=HTTP_200_OK)
 
     @post("/sign/{identifier:str}")  # type: ignore[untyped-decorator]

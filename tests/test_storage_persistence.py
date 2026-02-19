@@ -369,7 +369,9 @@ class TestStoragePersistence:
         assert len(keys) == 2
 
         # Check is_external flag
-        key_dict = {k[0]: k[3] for k in keys}  # pubkey_hex -> is_external
+        key_dict = {
+            k.pubkey_hex: k.is_external for k in keys
+        }  # pubkey_hex -> is_external
         assert key_dict[ext_pubkey_hex] is True
         assert key_dict[mng_pubkey_hex] is False
 

@@ -4,11 +4,10 @@ import logging
 from typing import TYPE_CHECKING
 
 from .keystore import Keystore, KeystoreError
+from .models import KeystoreLoadResult
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    from py3signer_core import PublicKey, SecretKey
 
     from .storage import KeyStorage
 
@@ -100,7 +99,7 @@ def scan_keystore_directories(
 def load_keystore_with_password(
     keystore_path: Path,
     password_path: Path,
-) -> tuple[PublicKey, SecretKey, str, str | None, str]:
+) -> KeystoreLoadResult:
     """Load a single keystore with its password.
 
     Args:
@@ -108,7 +107,7 @@ def load_keystore_with_password(
         password_path: Path to the password text file
 
     Returns:
-        Tuple of (public_key, secret_key, path, description, password)
+        KeystoreLoadResult containing all keystore data
 
     Raises:
         KeystoreError: If keystore is invalid or password is incorrect
@@ -127,7 +126,70 @@ def load_keystore_with_password(
     secret_key = keystore.decrypt(password)
     pubkey = secret_key.public_key()
 
-    return pubkey, secret_key, keystore.path, keystore.description, password
+    return KeystoreLoadResult(
+        pubkey=pubkey,
+        secret_key=secret_key,
+        path=keystore.path,
+        description=keystore.description,
+        password=password,
+    )
+
+
+def _load_single_keystore(
+    base_name: str,
+    keystore_path: Path,
+    password_path: Path,
+    storage: KeyStorage,
+    as_external: bool = False,
+) -> bool:
+    """Load a single keystore into storage.
+
+    Args:
+        base_name: Base name of the keystore for logging
+        keystore_path: Path to the keystore JSON file
+        password_path: Path to the password text file
+        storage: KeyStorage instance to load keys into
+        as_external: If True, load as external key; otherwise as managed key
+
+    Returns:
+        True if successful, False otherwise
+
+    """
+    try:
+        result = load_keystore_with_password(keystore_path, password_path)
+
+        if as_external:
+            storage.add_external_key(
+                result.pubkey,
+                result.secret_key,
+                result.path,
+                result.description,
+            )
+        else:
+            # Read keystore JSON for persistence to managed storage
+            keystore_json = keystore_path.read_text()
+
+            storage.add_key(
+                result.pubkey,
+                result.secret_key,
+                result.path,
+                result.description,
+                keystore_json=keystore_json,
+                password=result.password,
+            )
+
+        logger.info(f"Loaded keystore: {base_name}")
+        return True
+    except KeystoreError as e:
+        logger.error(f"Failed to load keystore {base_name}: {e}")
+    except ValueError as e:
+        logger.error(f"Failed to add keystore {base_name} to storage: {e}")
+    except Exception as e:
+        logger.error(f"Unexpected error loading keystore {base_name}: {e}")
+    else:
+        logger.info(f"Loaded keystore: {base_name}")
+        return True
+    return False
 
 
 def load_keystores_from_directory(
@@ -150,44 +212,12 @@ def load_keystores_from_directory(
     keystores = scan_keystore_directory(directory)
 
     success_count = 0
-    failure_count = 0
-
     for base_name, keystore_path in keystores.items():
         password_path = keystore_path.with_suffix(".txt")
-
-        try:
-            pubkey, secret_key, path, description, password = (
-                load_keystore_with_password(
-                    keystore_path,
-                    password_path,
-                )
-            )
-
-            # Read keystore JSON for persistence to managed storage
-            keystore_json = keystore_path.read_text()
-
-            # Add key to managed storage
-            storage.add_key(
-                pubkey,
-                secret_key,
-                path,
-                description,
-                keystore_json=keystore_json,
-                password=password,
-            )
-
-            logger.info(f"Loaded keystore: {base_name}")
+        if _load_single_keystore(base_name, keystore_path, password_path, storage):
             success_count += 1
-        except KeystoreError as e:
-            logger.error(f"Failed to load keystore {base_name}: {e}")
-            failure_count += 1
-        except ValueError as e:
-            logger.error(f"Failed to add keystore {base_name} to storage: {e}")
-            failure_count += 1
-        except Exception as e:
-            logger.error(f"Unexpected error loading keystore {base_name}: {e}")
-            failure_count += 1
 
+    failure_count = len(keystores) - success_count
     logger.info(
         f"Bulk loading complete: {success_count} succeeded, {failure_count} failed",
     )
@@ -229,37 +259,13 @@ def load_external_keystores(
     keystores = scan_keystore_directories(keystores_path, passwords_path)
 
     success_count = 0
-    failure_count = 0
-
     for base_name, (json_file, password_file) in keystores.items():
-        try:
-            pubkey, secret_key, path, description, _password = (
-                load_keystore_with_password(
-                    json_file,
-                    password_file,
-                )
-            )
-
-            # Add as external key (not copied to managed storage)
-            storage.add_external_key(
-                pubkey,
-                secret_key,
-                path,
-                description,
-            )
-
-            logger.info(f"Loaded external keystore: {base_name}")
+        if _load_single_keystore(
+            base_name, json_file, password_file, storage, as_external=True
+        ):
             success_count += 1
-        except KeystoreError as e:
-            logger.error(f"Failed to load external keystore {base_name}: {e}")
-            failure_count += 1
-        except ValueError as e:
-            logger.error(f"Failed to add external keystore {base_name}: {e}")
-            failure_count += 1
-        except Exception as e:
-            logger.error(f"Unexpected error loading external keystore {base_name}: {e}")
-            failure_count += 1
 
+    failure_count = len(keystores) - success_count
     logger.info(
         f"External keystore loading complete: {success_count} succeeded, {failure_count} failed",
     )

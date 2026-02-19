@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .metrics import KEYS_LOADED
+from .models import KeyInfo
 
 if TYPE_CHECKING:
     from py3signer_core import PublicKey, SecretKey
@@ -320,20 +321,20 @@ class KeyStorage:
         """Check if a key is a managed key (imported via API)."""
         return pubkey_hex in self._managed_keys
 
-    def list_keys(self) -> list[tuple[str, str, str | None, bool]]:
+    def list_keys(self) -> list[KeyInfo]:
         """List all stored keys.
 
         Returns:
-            List of (pubkey_hex, path, description, is_external) tuples.
+            List of KeyInfo objects containing key metadata.
         """
         return [
-            (
-                h,
-                k.path,
-                k.description,
-                h in self._external_keys,
+            KeyInfo(
+                pubkey_hex=pubkey_hex,
+                path=key_pair.path,
+                description=key_pair.description,
+                is_external=pubkey_hex in self._external_keys,
             )
-            for h, k in self._keys.items()
+            for pubkey_hex, key_pair in self._keys.items()
         ]
 
     def remove_key(self, pubkey_hex: str) -> None:

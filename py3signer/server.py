@@ -56,21 +56,19 @@ def _load_managed_keystores(
         password_path = keystore_path.with_suffix(".txt")
 
         try:
-            pubkey, secret_key, path, description, password = (
-                load_keystore_with_password(
-                    keystore_path,
-                    password_path,
-                )
+            result = load_keystore_with_password(
+                keystore_path,
+                password_path,
             )
 
             # Add as managed key (already in managed storage)
             storage.add_key(
-                pubkey,
-                secret_key,
-                path,
-                description,
+                result.pubkey,
+                result.secret_key,
+                result.path,
+                result.description,
                 keystore_json=keystore_path.read_text(),
-                password=password,
+                password=result.password,
             )
 
             logger.info(f"Loaded managed keystore: {base_name}")

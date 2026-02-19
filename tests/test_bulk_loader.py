@@ -158,16 +158,16 @@ class TestLoadKeystoreWithPassword:
         password_path = tmp_path / "password.txt"
         password_path.write_text("testpassword123")
 
-        pubkey, secret_key, path, description, password = load_keystore_with_password(
+        result = load_keystore_with_password(
             keystore_path,
             password_path,
         )
 
-        assert pubkey is not None
-        assert secret_key is not None
-        assert path == "m/12381/3600/0/0/0"
-        assert description == "Test keystore with scrypt KDF (N=262144)"
-        assert password == "testpassword123"
+        assert result.pubkey is not None
+        assert result.secret_key is not None
+        assert result.path == "m/12381/3600/0/0/0"
+        assert result.description == "Test keystore with scrypt KDF (N=262144)"
+        assert result.password == "testpassword123"
 
     def test_wrong_password(self, tmp_path: Path) -> None:
         """Test loading with incorrect password."""
