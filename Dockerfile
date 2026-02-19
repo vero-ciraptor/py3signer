@@ -1,6 +1,6 @@
-ARG PYTHON_IMAGE_TAG="3.12-slim-bookworm"
-ARG RUST_IMAGE_TAG="1.84-bookworm"
-ARG UV_IMAGE_TAG="0.5"
+ARG PYTHON_IMAGE_TAG="3.13-slim-bookworm"
+ARG RUST_IMAGE_TAG="1.93-bookworm"
+ARG UV_IMAGE_TAG="0.10"
 
 # uv image
 FROM ghcr.io/astral-sh/uv:${UV_IMAGE_TAG} AS uv-image
