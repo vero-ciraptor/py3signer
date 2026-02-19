@@ -337,6 +337,30 @@ class KeyStorage:
             for pubkey_hex, key_pair in self._keys.items()
         ]
 
+    def _remove_from_tracking(self, pubkey_hex: str) -> tuple[bool, bool]:
+        """Remove key from internal tracking sets.
+
+        Args:
+            pubkey_hex: The public key hex to remove
+
+        Returns:
+            Tuple of (was_external, was_managed)
+
+        """
+        is_external = pubkey_hex in self._external_keys
+        is_managed = pubkey_hex in self._managed_keys
+
+        del self._keys[pubkey_hex]
+        if is_external:
+            self._external_keys.discard(pubkey_hex)
+        if is_managed:
+            self._managed_keys.discard(pubkey_hex)
+
+        KEYS_LOADED.set(len(self._keys))
+        logger.info(f"Removed key: {pubkey_hex[:20]}...")
+
+        return is_external, is_managed
+
     def remove_key(self, pubkey_hex: str) -> None:
         """Remove a key from storage and delete from disk.
 
@@ -351,19 +375,7 @@ class KeyStorage:
         if pubkey_hex not in self._keys:
             raise KeyNotFound
 
-        # Check if this is an external key
-        is_external = pubkey_hex in self._external_keys
-        is_managed = pubkey_hex in self._managed_keys
-
-        # Remove from tracking first
-        del self._keys[pubkey_hex]
-        if is_external:
-            self._external_keys.discard(pubkey_hex)
-        if is_managed:
-            self._managed_keys.discard(pubkey_hex)
-
-        KEYS_LOADED.set(len(self._keys))
-        logger.info(f"Removed key: {pubkey_hex[:20]}...")
+        _is_external, is_managed = self._remove_from_tracking(pubkey_hex)
 
         # Deletion logic:
         # 1. Check external first (priority), delete if exists
