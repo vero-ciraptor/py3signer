@@ -56,14 +56,21 @@ class ForkInfo(msgspec.Struct, frozen=True):
 # Type-specific data structs
 
 
+class Checkpoint(msgspec.Struct, frozen=True):
+    """Checkpoint data structure for attestation source/target."""
+
+    epoch: str
+    root: str
+
+
 class AttestationData(msgspec.Struct, frozen=True):
     """Attestation data for ATTESTATION signing type."""
 
     slot: str
     index: str
     beacon_block_root: str = msgspec.field(name="beacon_block_root")
-    source: dict[str, str]  # {"epoch": str, "root": str}
-    target: dict[str, str]  # {"epoch": str, "root": str}
+    source: Checkpoint
+    target: Checkpoint
 
 
 class AggregationSlot(msgspec.Struct, frozen=True):
@@ -110,13 +117,6 @@ class SyncAggregatorSelectionData(msgspec.Struct, frozen=True):
 
     slot: str
     subcommittee_index: str = msgspec.field(name="subcommittee_index")
-
-
-class Checkpoint(msgspec.Struct, frozen=True):
-    """Checkpoint data structure."""
-
-    epoch: str
-    root: str
 
 
 class BeaconBlockHeader(msgspec.Struct, frozen=True):
