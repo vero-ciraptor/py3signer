@@ -57,7 +57,7 @@ def create_app(
     auth_token = config.auth_token if config else None
 
     @asynccontextmanager
-    async def lifespan(app: Litestar) -> AsyncGenerator[None, None]:
+    async def lifespan(app: Litestar) -> AsyncGenerator[None]:
         """Lifespan context manager for startup/shutdown."""
         logger.info("Starting py3signer server")
         yield

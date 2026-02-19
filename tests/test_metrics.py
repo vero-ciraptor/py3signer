@@ -12,7 +12,7 @@ from py3signer.storage import KeyStorage
 
 
 @pytest.fixture
-async def metrics_client() -> AsyncGenerator[AsyncTestClient, None]:
+async def metrics_client() -> AsyncGenerator[AsyncTestClient]:
     """Create a test client for metrics server."""
     app = Litestar(route_handlers=[MetricsController], debug=False)
     async with AsyncTestClient(app) as client:

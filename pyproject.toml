@@ -1,5 +1,5 @@
 [build-system]
-requires = ["maturin>=1.0"]
+requires = ["maturin>=1.12,<2.0"]
 build-backend = "maturin"
 
 [project]
@@ -7,7 +7,7 @@ name = "py3signer"
 version = "0.1.0"
 description = "A Remote BLS Signer for Ethereum Consensus Layer"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "litestar[standard]>=2.21.0",
     "granian>=2.7.0",
@@ -50,5 +50,5 @@ select = [
 ignore = ["E501"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 strict = true

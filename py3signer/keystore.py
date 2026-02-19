@@ -79,7 +79,7 @@ class Keystore(msgspec.Struct):
             raise KeystoreError("Invalid crypto structure")
 
     @classmethod
-    def from_file(cls, path: Path) -> "Keystore":
+    def from_file(cls, path: Path) -> Keystore:
         """Load keystore from JSON file."""
         try:
             with open(path) as f:
@@ -93,7 +93,7 @@ class Keystore(msgspec.Struct):
             raise KeystoreError(f"Invalid keystore structure: {e}")
 
     @classmethod
-    def from_json(cls, json_str: str) -> "Keystore":
+    def from_json(cls, json_str: str) -> Keystore:
         """Load keystore from JSON string."""
         try:
             data = json.loads(json_str)

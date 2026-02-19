@@ -23,49 +23,11 @@ py3signer implements the standard Keymanager API for importing BLS12-381 keys an
 
 ## Requirements
 
-- Python 3.12+
+- Python 3.14+
 - Rust toolchain (for building the extension)
 - [uv](https://github.com/astral-sh/uv) - Python package manager
 
 ## Installation
-
-### Prerequisites
-
-```bash
-# Install uv
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Install Rust
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-### Development Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/example/py3signer.git
-cd py3signer
-
-# Run setup script
-./setup.sh
-
-# Or manually:
-uv sync
-uv run maturin develop
-
-# Install pre-commit hooks (optional but recommended)
-pre-commit install
-```
-
-### Production Installation
-
-```bash
-# Build wheel
-uv run maturin build --release
-
-# Install from wheel
-uv pip install dist/py3signer_core*.whl
-```
 
 ### Docker
 

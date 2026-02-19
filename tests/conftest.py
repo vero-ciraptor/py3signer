@@ -30,7 +30,7 @@ def config_with_keystore_path(tmp_path: Path) -> Config:
 
 
 @pytest.fixture
-def storage() -> Generator[KeyStorage, None, None]:
+def storage() -> Generator[KeyStorage]:
     """Create a fresh key storage."""
     storage = KeyStorage()
     yield storage
@@ -38,7 +38,7 @@ def storage() -> Generator[KeyStorage, None, None]:
 
 
 @pytest.fixture
-async def client(config: Config) -> AsyncGenerator[AsyncTestClient, None]:
+async def client(config: Config) -> AsyncGenerator[AsyncTestClient]:
     """Create a test client."""
     app = create_app(config)
     async with AsyncTestClient(app) as client:
@@ -48,7 +48,7 @@ async def client(config: Config) -> AsyncGenerator[AsyncTestClient, None]:
 @pytest.fixture
 async def client_with_persistence(
     config_with_keystore_path: Config,
-) -> AsyncGenerator[AsyncTestClient, None]:
+) -> AsyncGenerator[AsyncTestClient]:
     """Create a test client with keystore persistence enabled."""
     app = create_app(config_with_keystore_path)
     async with AsyncTestClient(app) as client:

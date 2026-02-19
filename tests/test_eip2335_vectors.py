@@ -301,7 +301,3 @@ class TestEdgeCases:
         assert isinstance(normalized, str)
         # Control codes should be stripped
         assert "\x00" not in normalized
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
