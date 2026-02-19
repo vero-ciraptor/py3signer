@@ -243,36 +243,41 @@ class TestBulkLoaderIntegration:
     """Integration tests for bulk loader."""
 
     def test_multiple_valid_keystores(self, tmp_path: Path) -> None:
-        """Test loading multiple valid keystores."""
+        """Test loading multiple valid keystores with unique keys."""
         test_data = Path(__file__).parent / "data"
-        original_keystore = json.loads(
-            (test_data / "test_keystore_scrypt.json").read_text(),
-        )
 
-        # Create multiple keystores with unique pubkeys
-        for i in range(3):
-            keystore_data = original_keystore.copy()
-            keystore_data["pubkey"] = f"{i + 2:02x}" * 48  # Unique pubkey for each
-            keystore_data["uuid"] = f"00000000-0000-0000-0000-{i:012d}"
+        # Use three different keystores with unique secret keys
+        # Note: test_keystore.json and test_keystore_scrypt.json have the same secret
+        # but failing_keystore.json has a different one
+        keystores_to_create = [
+            ("test_keystore_scrypt.json", "testpassword123"),
+            ("test_keystore_pbkdf2.json", "testpassword123"),
+            ("failing_keystore.json", "LnCqP2XDKqPwRX96vKq0If512SrCebdDDRLRYCEI4fM="),
+        ]
+
+        created_keystores = []
+        for i, (keystore_file, password) in enumerate(keystores_to_create):
+            keystore_data = json.loads((test_data / keystore_file).read_text())
 
             keystore_json = tmp_path / f"keystore{i}.json"
             keystore_txt = tmp_path / f"keystore{i}.txt"
 
-            # Note: This won't actually decrypt properly since we changed the pubkey
-            # but the keystore structure is valid
             keystore_json.write_text(json.dumps(keystore_data))
-            keystore_txt.write_text("testpassword123")
+            keystore_txt.write_text(password)
+            created_keystores.append((keystore_file, password))
 
-        # This will fail to decrypt but that's expected - we're testing the flow
+        # The first two keystores have the same secret key (different KDFs),
+        # so one will succeed and one will fail as a duplicate.
+        # The third keystore has a different secret key, so it will succeed.
         storage = KeyStorage()
-        success, _failures = load_keystores_from_directory(tmp_path, storage)
+        success, failures = load_keystores_from_directory(tmp_path, storage)
 
-        # TODO look into why this is not passing
-        assert success == 0
-        assert _failures == 3
+        # Expected: 2 succeed (first scrypt + failing), 1 fails (pbkdf2 is duplicate)
+        assert success == 2, f"Expected 2 successes, got {success}"
+        assert failures == 1, f"Expected 1 failure, got {failures}"
+        assert len(storage) == 2
 
-        # All will fail due to pubkey mismatch or decryption failure
-        # but the scanner should find them
+        # Verify all keystores were found by scanner
         keystores = scan_keystore_directory(tmp_path)
         assert len(keystores) == 3
 
