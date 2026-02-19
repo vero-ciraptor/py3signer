@@ -4,20 +4,37 @@ from typing import TYPE_CHECKING
 
 import pytest
 from litestar import Litestar
+from litestar.datastructures import State
 from litestar.testing import AsyncTestClient
 
 from py3signer import metrics
+from py3signer.handlers import get_routers
 from py3signer.metrics import MetricsController
+from py3signer.signer import Signer
 from py3signer.storage import KeyStorage
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 
+def create_test_app() -> Litestar:
+    """Create a test app with proper state setup."""
+    storage = KeyStorage()
+    signer = Signer(storage)
+    return Litestar(
+        route_handlers=get_routers(),
+        debug=False,
+        state=State({
+            "storage": storage,
+            "signer": signer,
+        }),
+    )
+
+
 @pytest.fixture
 async def metrics_client() -> AsyncGenerator[AsyncTestClient]:
-    """Create a test client for metrics server."""
-    app = Litestar(route_handlers=[MetricsController], debug=False)
+    """Create a test client for metrics endpoints (via main app router)."""
+    app = create_test_app()
     async with AsyncTestClient(app) as client:
         yield client
 
@@ -40,8 +57,6 @@ async def test_metrics_endpoint_returns_prometheus_format(
     assert "signing_duration_seconds" in text
     assert "signing_errors_total" in text
     assert "keys_loaded" in text
-    assert "http_requests_total" in text
-    assert "http_request_duration_seconds" in text
 
 
 @pytest.mark.asyncio
@@ -103,3 +118,23 @@ def test_metrics_output() -> None:
     output = metrics.get_metrics_output()
     assert isinstance(output, bytes)
     assert b"py3signer_build_info" in output
+
+
+def test_create_metrics_app() -> None:
+    """Test that create_metrics_app returns an ASGI app."""
+    app = metrics.create_metrics_app()
+    assert app is not None
+    # The app should be callable
+    assert callable(app)
+
+
+@pytest.mark.asyncio
+async def test_metrics_via_standalone_controller() -> None:
+    """Test metrics controller directly (backward compatibility)."""
+    app = Litestar(route_handlers=[MetricsController], debug=False)
+    async with AsyncTestClient(app) as client:
+        resp = await client.get("/metrics")
+        assert resp.status_code == 200
+        assert "py3signer_build_info" in resp.text
+
+

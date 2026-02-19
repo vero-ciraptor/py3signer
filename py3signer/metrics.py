@@ -1,4 +1,4 @@
-"""Prometheus metrics for py3signer with Litestar.
+"""Prometheus metrics for py3signer.
 
 This module defines and exposes all Prometheus metrics used by py3signer.
 """
@@ -6,7 +6,6 @@ This module defines and exposes all Prometheus metrics used by py3signer.
 from __future__ import annotations
 
 import logging
-import threading
 from typing import TYPE_CHECKING
 
 from litestar import Controller, get
@@ -19,10 +18,11 @@ from prometheus_client import (
     Histogram,
     Info,
     generate_latest,
+    make_asgi_app,
 )
 
 if TYPE_CHECKING:
-    from http.server import HTTPServer
+    from litestar.types import ASGIApp
 
 logger = logging.getLogger(__name__)
 
@@ -94,91 +94,35 @@ def get_metrics_content_type() -> str:
     return CONTENT_TYPE_LATEST
 
 
-# Metrics HTTP controller
+def create_metrics_app() -> ASGIApp:
+    """Create ASGI app for serving Prometheus metrics.
+    
+    This uses prometheus_client's make_asgi_app() to serve metrics
+    at the /metrics endpoint. The returned app can be mounted in
+    the main Litestar application.
+    """
+    return make_asgi_app(registry=REGISTRY)
 
 
+# Keep MetricsController for backward compatibility and health endpoint
 class MetricsController(Controller):  # type: ignore[misc]
     """Prometheus metrics HTTP endpoints."""
 
     path = "/"
 
+    @get("/health")  # type: ignore[untyped-decorator]
+    async def health(self) -> dict[str, str]:
+        """Health check for metrics."""
+        return {"status": "healthy"}
+
     @get("/metrics")  # type: ignore[untyped-decorator]
     async def metrics(self) -> Response:
-        """Handler for the /metrics endpoint."""
+        """Handler for the /metrics endpoint (kept for backward compatibility).
+        
+        Note: In production, the metrics endpoint is served via the ASGI app
+        mounted in the main Litestar application for better performance.
+        """
         return Response(
             content=get_metrics_output(),
             headers={"Content-Type": get_metrics_content_type()},
         )
-
-    @get("/health")  # type: ignore[untyped-decorator]
-    async def health(self) -> dict[str, str]:
-        """Health check for metrics server."""
-        return {"status": "healthy"}
-
-
-# Standalone metrics server for multi-process scenarios using threaded HTTP server
-
-
-class MetricsServer:
-    """Standalone Prometheus metrics HTTP server using basic threaded HTTP server."""
-
-    def __init__(self, host: str = "127.0.0.1", port: int = 8081) -> None:
-        self._host = host
-        self._port = port
-        self._server: HTTPServer | None = None
-        self._thread: threading.Thread | None = None
-        self._running = False
-
-    async def start(self) -> None:
-        """Start the metrics server in a background thread."""
-        from http.server import BaseHTTPRequestHandler, HTTPServer
-
-        class MetricsHandler(BaseHTTPRequestHandler):
-            """HTTP handler for metrics endpoint."""
-
-            def log_message(self, _format: str, *args: object) -> None:
-                # Suppress default logging
-                pass
-
-            def do_GET(self) -> None:
-                if self.path == "/metrics":
-                    self.send_response(200)
-                    self.send_header("Content-Type", get_metrics_content_type())
-                    self.end_headers()
-                    self.wfile.write(get_metrics_output())
-                elif self.path == "/health":
-                    self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
-                    self.end_headers()
-                    self.wfile.write(b'{"status": "healthy"}')
-                else:
-                    self.send_response(404)
-                    self.end_headers()
-
-        def run_server() -> None:
-            """Run the HTTP server."""
-            self._server = HTTPServer((self._host, self._port), MetricsHandler)
-            logger.info(
-                f"Metrics server running at http://{self._host}:{self._port}/metrics",
-            )
-            while self._running:
-                try:
-                    self._server.handle_request()
-                except Exception:
-                    break
-
-        self._running = True
-        self._thread = threading.Thread(target=run_server, daemon=True)
-        self._thread.start()
-        logger.info("Metrics server started at http://self._host:self._port/metrics")
-
-    async def stop(self) -> None:
-        """Stop the metrics server."""
-        self._running = False
-        if self._server:
-            # Close the server socket to wake up the thread
-            self._server.server_close()
-            self._server = None
-        if self._thread:
-            self._thread.join(timeout=2)
-        logger.info("Metrics server stopped")

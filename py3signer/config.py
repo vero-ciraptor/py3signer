@@ -2,6 +2,7 @@
 
 import argparse
 import multiprocessing
+import warnings
 from pathlib import Path
 
 import msgspec
@@ -17,7 +18,8 @@ class Config(msgspec.Struct, frozen=True):
     # Logging
     log_level: str = "INFO"
 
-    # Metrics settings
+    # Deprecated: Metrics settings (kept for backward compatibility)
+    # Metrics are now served on the main port at /metrics
     metrics_host: str = "127.0.0.1"
     metrics_port: int = 8081
 
@@ -41,12 +43,6 @@ class Config(msgspec.Struct, frozen=True):
         if self.log_level.upper() not in valid_levels:
             raise ValueError(
                 f"log_level must be one of {valid_levels}, got {self.log_level}",
-            )
-
-        # Validate metrics port
-        if self.metrics_port < 1 or self.metrics_port > 65535:
-            raise ValueError(
-                f"metrics_port must be between 1 and 65535, got {self.metrics_port}",
             )
 
         # Validate key_store_path if provided
@@ -129,12 +125,12 @@ def get_config() -> Config:
         "--metrics-port",
         type=int,
         default=8081,
-        help="Port for metrics server (default: 8081)",
+        help="Deprecated: Metrics are now served on the main port at /metrics",
     )
     parser.add_argument(
         "--metrics-host",
         default="127.0.0.1",
-        help="Host for metrics server (default: 127.0.0.1)",
+        help="Deprecated: Metrics are now served on the main port at /metrics",
     )
     parser.add_argument(
         "--key-store-path",
@@ -163,6 +159,15 @@ def get_config() -> Config:
     )
 
     args = parser.parse_args()
+
+    # Warn about deprecated options
+    if args.metrics_port != 8081 or args.metrics_host != "127.0.0.1":
+        warnings.warn(
+            "--metrics-port and --metrics-host are deprecated. "
+            "Metrics are now served on the main port at /metrics",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     # Build config dict from CLI arguments
     config_dict: dict[str, object] = {

@@ -108,15 +108,7 @@ async def run_server(config: Config) -> None:
         log_level=granian_log_level,
     )
 
-    # Start metrics server in the main process (not workers)
-    from .metrics import MetricsServer
-
-    metrics_server = MetricsServer(host=config.metrics_host, port=config.metrics_port)
-    await metrics_server.start()
-
     try:
         server.serve()
     except KeyboardInterrupt:
         logger.info("Shutting down...")
-    finally:
-        await metrics_server.stop()
