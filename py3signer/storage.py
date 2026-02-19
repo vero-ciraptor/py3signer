@@ -212,6 +212,14 @@ class KeyStorage:
         else:
             return True
 
+    def _update_key_metrics(self) -> None:
+        """Update the keys_loaded metric to reflect current state.
+
+        This is called automatically whenever keys are added or removed,
+        ensuring the metric always matches the actual storage state.
+        """
+        KEYS_LOADED.set(len(self._keys))
+
     def add_external_key(
         self,
         pubkey: PublicKey,
@@ -249,7 +257,7 @@ class KeyStorage:
             description=description,
         )
         self._external_keys.add(pubkey_hex)
-        KEYS_LOADED.set(len(self._keys))
+        self._update_key_metrics()
         logger.info(f"Added external key: {pubkey_hex[:20]}...")
 
         return pubkey_hex
@@ -294,7 +302,7 @@ class KeyStorage:
             description=description,
         )
         self._managed_keys.add(pubkey_hex)
-        KEYS_LOADED.set(len(self._keys))
+        self._update_key_metrics()
         logger.info(f"Added managed key: {pubkey_hex[:20]}...")
 
         persisted_to_disk = False
@@ -356,7 +364,7 @@ class KeyStorage:
         if is_managed:
             self._managed_keys.discard(pubkey_hex)
 
-        KEYS_LOADED.set(len(self._keys))
+        self._update_key_metrics()
         logger.info(f"Removed key: {pubkey_hex[:20]}...")
 
         return is_external, is_managed
@@ -406,4 +414,4 @@ class KeyStorage:
         self._keys.clear()
         self._external_keys.clear()
         self._managed_keys.clear()
-        KEYS_LOADED.set(0)
+        self._update_key_metrics()
