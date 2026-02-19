@@ -42,9 +42,11 @@ addopts = ["-v", "--tb=short"]
 select = [
     "ALL",
 ]
+ignore = ["BLE001", "EM", "G004"]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S", "ERA001"]
+"tests/*" = ["S", "ERA001", "E501", "PLR", "INP"]
+"rust/*.pyi" = ["PYI021"]
 
 [tool.mypy]
 python_version = "3.14"

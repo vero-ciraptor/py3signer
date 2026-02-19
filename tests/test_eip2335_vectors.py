@@ -11,7 +11,7 @@ import pytest
 from py3signer.keystore import Keystore, KeystoreError, normalize_password
 
 # Official EIP-2335 Scrypt Test Vector
-# Password: "𝔱𝔢𝔰𝔱𝔭𝔞𝔰𝔰𝔴𝔬𝔯𝔡🔑"
+# Password: "𝔱𝔢𝔰𝔱𝔭𝔞𝔰𝔰𝔴𝔬𝔯𝔡🔑"  # noqa: RUF003
 # Encoded Password: 0x7465737470617373776f7264f09f9491
 # Secret: 0x000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f
 EIP2335_SCRYPT_KEYSTORE: dict[str, Any] = {
@@ -46,7 +46,7 @@ EIP2335_SCRYPT_KEYSTORE: dict[str, Any] = {
 }
 
 # Official EIP-2335 PBKDF2 Test Vector
-# Password: "𝔱𝔢𝔰𝔱𝔭𝔞𝔰𝔰𝔴𝔬𝔯𝔡🔑"
+# Password: "𝔱𝔢𝔰𝔱𝔭𝔞𝔰𝔰𝔴𝔬𝔯𝔡🔑"  # noqa: RUF003
 # Encoded Password: 0x7465737470617373776f7264f09f9491
 # Secret: 0x000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f
 EIP2335_PBKDF2_KEYSTORE: dict[str, Any] = {
@@ -144,7 +144,7 @@ class TestPasswordNormalization:
     def test_nfkd_normalization(self) -> None:
         """Test NFKD normalization of passwords."""
         # Mathematical bold letters normalize to regular ASCII
-        password = "𝔱𝔢𝔰𝔱𝔭𝔞𝔰𝔰𝔴𝔬𝔯𝔡🔑"
+        password = "𝔱𝔢𝔰𝔱𝔭𝔞𝔰𝔰𝔴𝔬𝔯𝔡🔑"  # noqa: RUF001
         normalized = normalize_password(password)
 
         # Should normalize to "testpassword🔑"

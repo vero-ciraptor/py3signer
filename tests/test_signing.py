@@ -1,9 +1,6 @@
 """Tests for signing operations."""
 
 import pytest
-
-from py3signer.signer import Signer, SignerError
-from py3signer.storage import KeyStorage
 from py3signer_core import (
     PublicKey,
     SecretKey,
@@ -12,6 +9,9 @@ from py3signer_core import (
     sign,
     verify,
 )
+
+from py3signer.signer import Signer, SignerError
+from py3signer.storage import KeyStorage
 
 
 class TestCryptoCore:

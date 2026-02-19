@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 import msgspec
-
 from py3signer_core import SecretKey, decrypt_keystore
 
 logger = logging.getLogger(__name__)

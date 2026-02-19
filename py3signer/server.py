@@ -1,9 +1,12 @@
 """Litestar server setup with Granian ASGI server."""
 
 import logging
+import multiprocessing
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+from granian import Granian
+from granian.constants import Interfaces
 from litestar import Litestar
 from litestar.datastructures import State
 
@@ -86,18 +89,12 @@ async def run_server(config: Config) -> None:
     """Run the Litestar server with Granian."""
     logger.info(f"Starting py3signer on {config.host}:{config.port}")
 
-    # Import Granian
-    from granian import Granian
-    from granian.constants import Interfaces
-
     # Import asgi module to store config
     from . import asgi
 
     asgi.store_config_in_env(config)
 
     # Run with Granian ASGI using factory pattern for multi-worker support
-    import multiprocessing
-
     workers = getattr(config, "workers", multiprocessing.cpu_count())
 
     # Build ssl_key and ssl_cert for Granian

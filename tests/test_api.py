@@ -96,7 +96,7 @@ async def test_import_keystore_validation_errors(
     assert resp.status_code == 400
 
     data = resp.json()
-    assert "detail" in data or "error" in data
+    assert expected_error in data["detail"]
 
 
 @pytest.mark.asyncio
@@ -392,16 +392,23 @@ async def test_import_duplicate_keystore(
     "request_body,expected_error",
     [
         # Missing type discriminator
-        ({}, "missing required field"),
+        ({}, "missing required field `type`"),
         # Invalid type
-        ({"type": "INVALID_TYPE"}, "Validation error"),
-        # Missing fork_info
-        ({"type": "ATTESTATION"}, "missing required field"),
+        ({"type": "INVALID_TYPE"}, "Invalid value 'INVALID_TYPE'"),
+        # Missing attestation field
+        ({"type": "ATTESTATION"}, "missing required field `attestation`"),
         # Invalid signing_root length
         (
             {
                 "type": "ATTESTATION",
                 "signing_root": "0xabcd",
+                "attestation": {
+                    "slot": "123",
+                    "index": "0",
+                    "beacon_block_root": "0x" + "00" * 32,
+                    "source": {"epoch": "0", "root": "0x" + "00" * 32},
+                    "target": {"epoch": "1", "root": "0x" + "00" * 32},
+                },
                 "fork_info": {
                     "fork": {
                         "previous_version": "0x00",
@@ -411,7 +418,7 @@ async def test_import_duplicate_keystore(
                     "genesis_validators_root": "0x00" * 32,
                 },
             },
-            "signing_root",
+            "signing_root must be 32 bytes",
         ),
     ],
 )
@@ -432,7 +439,7 @@ async def test_sign_validation_errors(
     assert resp.status_code == 400
 
     data = resp.json()
-    assert "detail" in data or "error" in data
+    assert expected_error in data["detail"]
 
 
 @pytest.mark.asyncio
