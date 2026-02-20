@@ -36,12 +36,15 @@ logger = logging.getLogger(__name__)
 MULTIPROC_DIR: Path | None = None
 
 
-def setup_multiproc_dir() -> None:
+def setup_multiproc_dir() -> Path:
     """Set up Prometheus multi-process metrics directory.
 
     Must be called BEFORE importing prometheus_client in multi-process mode.
     This creates a temporary directory that all worker processes use to
     share metric data via files.
+
+    Returns:
+        Path to the multi-process metrics directory.
     """
     global MULTIPROC_DIR
 
@@ -49,14 +52,16 @@ def setup_multiproc_dir() -> None:
     existing = os.environ.get("PROMETHEUS_MULTIPROC_DIR")
     if existing:
         MULTIPROC_DIR = Path(existing)
-        return
+        logger.info(f"Using existing Prometheus multi-process metrics dir: {existing}")
+        return MULTIPROC_DIR
 
     # Create a temp directory for multi-process metrics
     temp_dir = tempfile.mkdtemp(prefix="py3signer_metrics_")
     MULTIPROC_DIR = Path(temp_dir)
     os.environ["PROMETHEUS_MULTIPROC_DIR"] = temp_dir
 
-    logger.debug(f"Set up Prometheus multi-process metrics dir: {temp_dir}")
+    logger.info(f"Set up Prometheus multi-process metrics dir: {temp_dir}")
+    return MULTIPROC_DIR
 
 
 def cleanup_multiproc_dir() -> None:
@@ -85,21 +90,46 @@ def cleanup_multiproc_dir() -> None:
     logger.info(f"Cleaned up Prometheus multi-process metrics dir: {multiproc_dir}")
 
 
+def get_multiproc_dir() -> Path | None:
+    """Get the current multi-process metrics directory.
+
+    Returns:
+        Path to the multi-process metrics directory, or None if not set.
+    """
+    global MULTIPROC_DIR
+    if MULTIPROC_DIR is not None:
+        return MULTIPROC_DIR
+    existing = os.environ.get("PROMETHEUS_MULTIPROC_DIR")
+    if existing:
+        MULTIPROC_DIR = Path(existing)
+        return MULTIPROC_DIR
+    return None
+
+
 # Check if we're in multi-process mode (workers > 1)
 _workers_env = os.environ.get("PY3SIGNER_WORKERS", "1")
 _is_multiprocess = int(_workers_env) > 1
+
+# Get or set up multi-process directory if needed
+_multiproc_dir = get_multiproc_dir()
+if _is_multiprocess and _multiproc_dir is None:
+    _multiproc_dir = setup_multiproc_dir()
 
 # Create registry - use MultiProcessCollector if in multi-process mode
 if _is_multiprocess:
     from prometheus_client import multiprocess
 
+    # In multi-process mode, use the default registry which is aware of
+    # PROMETHEUS_MULTIPROC_DIR and will use MultiProcessCollector automatically
+    # when generate_latest() is called without an explicit registry
     REGISTRY = CollectorRegistry()
-    setup_multiproc_dir()
-    cleanup_multiproc_dir()
-    multiprocess.MultiProcessCollector(REGISTRY)  # type: ignore[no-untyped-call]
-    logger.info("Enabled Prometheus multi-process metrics mode")
+    multiprocess.MultiProcessCollector(REGISTRY, path=str(_multiproc_dir))  # type: ignore[no-untyped-call]
+    logger.info(
+        f"Enabled Prometheus multi-process metrics mode ({_workers_env} workers, dir={_multiproc_dir})"
+    )
 else:
     REGISTRY = CollectorRegistry()
+    logger.debug("Using single-process Prometheus metrics mode")
 
 # Application info
 APP_INFO = Info(

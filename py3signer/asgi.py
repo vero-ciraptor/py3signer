@@ -14,16 +14,10 @@ import msgspec
 
 from .config import Config
 
-# Set up multi-process metrics BEFORE importing anything that uses prometheus_client
-# This must happen before server/storage/metrics imports
-_config = json.loads(os.environ.get("PY3SIGNER_CONFIG", "{}"))
-_workers = _config.get("workers", 1)
-if _workers > 1:
-    from .metrics import setup_multiproc_dir
-
-    setup_multiproc_dir()
-
-from .server import create_app  # noqa: E402
+# Note: PROMETHEUS_MULTIPROC_DIR and PY3SIGNER_WORKERS should already be set
+# by the main process before Granian spawns workers. We just need to ensure
+# metrics are imported after these env vars are in place.
+from .server import create_app
 
 if TYPE_CHECKING:
     from collections.abc import Callable

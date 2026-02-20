@@ -3,19 +3,31 @@
 from __future__ import annotations
 
 import logging
-import multiprocessing
 import os
+import tempfile
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
-from granian import Granian
-from granian.constants import Interfaces
-from litestar import Litestar
-from litestar.datastructures import State
+# Set up multi-process metrics BEFORE importing anything that uses prometheus_client
+# This must be done early so both main process and workers use the same setup
+# Default to 4 workers for multi-process mode (can be overridden by PY3SIGNER_WORKERS env var)
+_workers_env = os.environ.get("PY3SIGNER_WORKERS", "4")
+_workers = int(_workers_env)
+if _workers > 1:
+    # Set the env var so workers can also see it
+    os.environ["PY3SIGNER_WORKERS"] = str(_workers)
+    if not os.environ.get("PROMETHEUS_MULTIPROC_DIR"):
+        _temp_dir = tempfile.mkdtemp(prefix="py3signer_metrics_")
+        os.environ["PROMETHEUS_MULTIPROC_DIR"] = _temp_dir
 
-from .bulk_loader import load_external_keystores
-from .handlers import get_routers
-from .storage import KeyStorage
+from granian import Granian  # noqa: E402
+from granian.constants import Interfaces  # noqa: E402
+from litestar import Litestar  # noqa: E402
+from litestar.datastructures import State  # noqa: E402
+
+from .bulk_loader import load_external_keystores  # noqa: E402
+from .handlers import get_routers  # noqa: E402
+from .storage import KeyStorage  # noqa: E402
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
@@ -167,18 +179,31 @@ async def run_server(config: Config) -> None:
     """Run the Litestar server with Granian."""
     logger.info(f"Starting py3signer on {config.host}:{config.port}")
 
+    # Run with Granian ASGI using factory pattern for multi-worker support
+    # Use env var if set (already set at import time), otherwise use config or default to 4
+    workers = int(
+        os.environ.get("PY3SIGNER_WORKERS", getattr(config, "workers", 4) or 4)
+    )
+
+    # Set workers env var BEFORE anything else (metrics uses this for multiproc mode)
+    os.environ["PY3SIGNER_WORKERS"] = str(workers)
+
+    # Set up multi-process metrics directory BEFORE importing asgi/metrics
+    # This must happen in the main process so the metrics server can read worker data
+    if workers > 1:
+        from .metrics import setup_multiproc_dir
+
+        multiproc_dir = setup_multiproc_dir()
+        logger.info(
+            f"Enabled Prometheus multi-process metrics mode ({workers} workers, dir={multiproc_dir})"
+        )
+
     # Import asgi module to store config
     from . import asgi
 
     asgi.store_config_in_env(config)
 
-    # Run with Granian ASGI using factory pattern for multi-worker support
-    workers = getattr(config, "workers", multiprocessing.cpu_count())
-
-    # Set workers env var BEFORE importing metrics (metrics uses this for multiproc mode)
-    os.environ["PY3SIGNER_WORKERS"] = str(workers)
-
-    # Now import metrics (after setting workers env var)
+    # Now import metrics (after setting workers env var and multiproc dir)
     from .metrics import MetricsServer, cleanup_multiproc_dir
 
     # Map py3signer log levels to Granian log levels
