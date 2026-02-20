@@ -1,7 +1,6 @@
 use blst::min_pk::{PublicKey, SecretKey, Signature as BlstSignature};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
 /// Size of a BLS secret key in bytes
@@ -13,27 +12,6 @@ const SIGNATURE_SIZE: usize = 96;
 
 /// BLS signature domain separation tag for Ethereum consensus
 const BLS_DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
-
-/// Ethereum consensus signing uses the signing root directly.
-/// The signing root (32 bytes) is computed by the validator client and
-/// already includes the domain. No additional hashing is needed before
-/// passing to BLS sign.
-fn prepare_message(message: &[u8], domain: &[u8]) -> [u8; 32] {
-    // The message should already be a 32-byte signing root
-    if message.len() == 32 {
-        message.try_into().expect("Message is 32 bytes")
-    } else {
-        // Fallback: hash if not 32 bytes (should not happen for consensus signing)
-        prepare_message_hashed(message, domain)
-    }
-}
-
-fn prepare_message_hashed(message: &[u8], domain: &[u8]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(domain);
-    hasher.update(message);
-    hasher.finalize().into()
-}
 
 /// `PyO3` wrapper for BLS `SecretKey`
 #[pyclass(name = "SecretKey", from_py_object)]
@@ -157,9 +135,10 @@ fn sign(
     py: Python,
     secret_key: &PySecretKey,
     message: &[u8],
-    domain: &[u8],
+    _domain: &[u8],
 ) -> PyResult<PySignature> {
-    let message_bytes = prepare_message(message, domain);
+    // Message is already validated to be 32 bytes by Python
+    let message_bytes: [u8; 32] = message.try_into().expect("Message is 32 bytes");
 
     // Clone the Arc to move it into the closure
     let sk = Arc::clone(&secret_key.inner);
@@ -181,9 +160,10 @@ fn verify(
     public_key: &PyPublicKey,
     message: &[u8],
     signature: &PySignature,
-    domain: &[u8],
+    _domain: &[u8],
 ) -> bool {
-    let message_bytes = prepare_message(message, domain);
+    // Message is already validated to be 32 bytes by Python
+    let message_bytes: [u8; 32] = message.try_into().expect("Message is 32 bytes");
 
     // Copy the inner values to move them into the closure
     let pk = public_key.inner;
