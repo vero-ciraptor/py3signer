@@ -1,5 +1,5 @@
 [workspace]
-members = ["rust/py3signer_core"]
+members = ["rust/py3signer_core", "rust/bls_bench"]
 resolver = "2"
 
 [profile.release]

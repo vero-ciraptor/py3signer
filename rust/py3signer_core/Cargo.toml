@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 name = "py3signer_core"
-crate-type = ["cdylib"]
+crate-type = ["cdylib", "rlib"]  # Added rlib for examples
 
 [dependencies]
 pyo3 = { version = "0.28.2", features = ["extension-module"] }
