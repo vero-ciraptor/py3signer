@@ -1,5 +1,6 @@
 """HTTP route handlers for Keymanager API with Litestar."""
 
+import asyncio
 import logging
 from enum import Enum
 from typing import Any
@@ -535,7 +536,8 @@ class SigningController(Controller):  # type: ignore[misc]
 
         # Perform signing
         try:
-            signature = signer.sign_data(
+            signature = await asyncio.to_thread(
+                signer.sign_data,
                 pubkey_hex=pubkey_hex,
                 data=message,
                 domain=domain,
