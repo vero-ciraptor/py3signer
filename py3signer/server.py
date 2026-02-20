@@ -128,55 +128,45 @@ def _load_managed_keystores(
 
 
 def create_app(
-    config: Config | None = None,
-    storage: KeyStorage | None = None,
-    signer: Signer | None = None,
+    config: Config,
 ) -> Litestar:
     """Create and configure the Litestar application."""
-    # If config is provided but storage/signer are not, create them
-    if config is not None and (storage is None or signer is None):
-        storage = KeyStorage(
-            data_dir=config.data_dir,
-            external_keystores_path=config.keystores_path,
-        )
-        signer = Signer(storage)
+    storage = KeyStorage(
+        data_dir=config.data_dir,
+        external_keystores_path=config.keystores_path,
+    )
+    signer = Signer(storage)
 
-        # Load keystores from managed storage (data_dir/keystores) - API imported keys
-        if config.data_dir:
-            keystores_dir = config.data_dir / "keystores"
-            if keystores_dir.exists():
-                success, failures = _load_managed_keystores(
-                    keystores_dir,
-                    storage,
-                )
-                logger.info(f"Loaded {success} keystores from managed storage")
-                if failures > 0:
-                    logger.warning(f"Failed to load {failures} keystores")
-            else:
-                logger.info(
-                    f"Managed keystores directory does not exist yet: {keystores_dir}"
-                )
-
-        # Load external keystores from --keystores-path (NOT copied to managed storage)
-        if config.keystores_path and config.keystores_passwords_path:
-            logger.info(
-                f"Loading external keystores from {config.keystores_path} "
-                f"(keys stay in external location, NOT copied)"
-            )
-            success, failures = load_external_keystores(
-                config.keystores_path,
-                config.keystores_passwords_path,
+    # Load keystores from managed storage (data_dir/keystores) - API imported keys
+    if config.data_dir:
+        keystores_dir = config.data_dir / "keystores"
+        if keystores_dir.exists():
+            success, failures = _load_managed_keystores(
+                keystores_dir,
                 storage,
             )
-            logger.info(f"Loaded {success} external keystores")
+            logger.info(f"Loaded {success} keystores from managed storage")
             if failures > 0:
-                logger.warning(f"Failed to load {failures} external keystores")
+                logger.warning(f"Failed to load {failures} keystores")
+        else:
+            logger.info(
+                f"Managed keystores directory does not exist yet: {keystores_dir}"
+            )
 
-    # Fallback for when storage/signer are passed directly (e.g., tests)
-    if storage is None:
-        storage = KeyStorage()
-    if signer is None:
-        signer = Signer(storage)
+    # Load external keystores from --keystores-path (NOT copied to managed storage)
+    if config.keystores_path and config.keystores_passwords_path:
+        logger.info(
+            f"Loading external keystores from {config.keystores_path} "
+            f"(keys stay in external location, NOT copied)"
+        )
+        success, failures = load_external_keystores(
+            config.keystores_path,
+            config.keystores_passwords_path,
+            storage,
+        )
+        logger.info(f"Loaded {success} external keystores")
+        if failures > 0:
+            logger.warning(f"Failed to load {failures} external keystores")
 
     @asynccontextmanager
     async def lifespan(_app: Litestar) -> AsyncGenerator[None]:
