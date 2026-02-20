@@ -1,151 +1,11 @@
 """Tests for Prometheus metrics functionality."""
 
 import contextlib
-from typing import TYPE_CHECKING
 
 import httpx
-import pytest
-from litestar import Litestar
-from litestar.datastructures import State
-from litestar.testing import AsyncTestClient
 
 from py3signer import metrics
-from py3signer.handlers import get_routers
-from py3signer.metrics import MetricsController, MetricsServer
-from py3signer.signer import Signer
-from py3signer.storage import KeyStorage
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
-
-
-def create_test_app() -> Litestar:
-    """Create a test app with proper state setup."""
-    storage = KeyStorage()
-    signer = Signer(storage)
-    return Litestar(
-        route_handlers=get_routers(),
-        debug=False,
-        state=State(
-            {
-                "storage": storage,
-                "signer": signer,
-            }
-        ),
-    )
-
-
-@pytest.fixture
-async def metrics_client() -> AsyncGenerator[AsyncTestClient]:
-    """Create a test client for metrics endpoints (via MetricsController)."""
-    # Use MetricsController directly for testing metrics output
-    app = Litestar(route_handlers=[MetricsController], debug=False)
-    async with AsyncTestClient(app) as client:
-        yield client
-
-
-@pytest.mark.asyncio
-async def test_metrics_endpoint_returns_prometheus_format(
-    metrics_client: AsyncTestClient,
-) -> None:
-    """Test that /metrics endpoint returns Prometheus format."""
-    resp = await metrics_client.get("/metrics")
-    assert resp.status_code == 200
-    content_type = resp.headers.get("content-type", "")
-    assert "text/plain" in content_type
-    assert "version=1.0.0" in content_type
-
-    text = resp.text
-    # Check for expected metrics
-    # Info metric doesn't work in multiprocessing mode
-    # assert "py3signer_build_info" in text, "Expected 'py3signer_build_info' in metrics"
-    assert "signing_requests_total" in text, (
-        "Expected 'signing_requests_total' in metrics"
-    )
-    assert "signing_duration_seconds" in text, (
-        "Expected 'signing_duration_seconds' in metrics"
-    )
-    assert "signing_errors_total" in text, "Expected 'signing_errors_total' in metrics"
-    assert "keys_loaded" in text, "Expected 'keys_loaded' in metrics"
-
-    # Verify format is valid Prometheus text format
-    assert "# HELP" in text or "# TYPE" in text or "py3signer" in text
-
-    # Each metric should be on its own line
-    lines = text.strip().split("\n")
-    assert len(lines) > 0
-
-    # Check that metrics have proper format (name value)
-    for line in lines:
-        if line.startswith("#"):
-            continue
-        if line.strip():
-            parts = line.split()
-            assert len(parts) >= 2, f"Invalid metric line: {line}"
-
-
-@pytest.mark.asyncio
-async def test_metrics_endpoint_health(metrics_client: AsyncTestClient) -> None:
-    """Test metrics server health endpoint."""
-    resp = await metrics_client.get("/health")
-    assert resp.status_code == 200
-    assert resp.headers["content-type"] == "application/json"
-
-    data = resp.json()
-    assert "status" in data, f"Expected 'status' key in response, got {data}"
-    assert data["status"] == "healthy", (
-        f"Expected status 'healthy', got {data['status']}"
-    )
-
-
-@pytest.mark.asyncio
-async def test_keys_loaded_gauge(metrics_client: AsyncTestClient) -> None:
-    """Test that keys_loaded gauge reflects key count."""
-    # Start fresh with 0 keys
-    metrics.KEYS_LOADED.set(0)
-
-    resp = await metrics_client.get("/metrics")
-    assert resp.status_code == 200
-    text = resp.text
-    assert "keys_loaded 0.0" in text or "keys_loaded" in text
-
-    # Create storage and add keys
-    storage = KeyStorage()
-
-    from py3signer_core import generate_random_key
-
-    for _ in range(3):
-        sk = generate_random_key()
-        pk = sk.public_key()
-        storage.add_key(pk, sk)
-
-    # Check gauge updated
-    resp = await metrics_client.get("/metrics")
-    text = resp.text
-    assert "keys_loaded 3.0" in text, (
-        f"Expected keys_loaded 3.0 in metrics, got: {text}"
-    )
-
-    # Remove a key
-    pk_hex = next(iter(storage._keys.keys()))
-    storage.remove_key(pk_hex)
-
-    # Check gauge updated
-    resp = await metrics_client.get("/metrics")
-    text = resp.text
-    assert "keys_loaded 2.0" in text, (
-        f"Expected keys_loaded 2.0 in metrics, got: {text}"
-    )
-
-    # Cleanup
-    storage.clear()
-
-    # Check gauge updated to 0
-    resp = await metrics_client.get("/metrics")
-    text = resp.text
-    assert "keys_loaded 0.0" in text or "keys_loaded 0" in text, (
-        f"Expected keys_loaded 0.0 in metrics, got: {text}"
-    )
+from py3signer.metrics import MetricsServer
 
 
 def _assert_prometheus_content_type(content_type: str) -> None:
@@ -170,18 +30,6 @@ def test_metrics_output() -> None:
     # Info metric doesn't work in multiprocessing mode
     # assert b"py3signer_build_info" in output
     assert b"signing_requests_total" in output or b"keys_loaded" in output
-
-
-@pytest.mark.asyncio
-async def test_metrics_via_standalone_controller() -> None:
-    """Test metrics controller directly (backward compatibility)."""
-    app = Litestar(route_handlers=[MetricsController], debug=False)
-    async with AsyncTestClient(app) as client:
-        resp = await client.get("/metrics")
-        assert resp.status_code == 200
-        _assert_prometheus_content_type(resp.headers.get("content-type", ""))
-        # Info metric doesn't work in multiprocessing mode
-        # assert "py3signer_build_info" in resp.text
 
 
 class TestMetricsServer:

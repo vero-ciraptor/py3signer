@@ -13,8 +13,6 @@ import threading
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from litestar import Controller, get
-from litestar.response import Response
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
@@ -185,33 +183,6 @@ def get_metrics_output() -> bytes:
 def get_metrics_content_type() -> str:
     """Get the content type for Prometheus metrics."""
     return CONTENT_TYPE_LATEST
-
-
-# Metrics HTTP controller for backward compatibility (used by tests and direct imports)
-
-
-class MetricsController(Controller):  # type: ignore[misc]
-    """Prometheus metrics HTTP endpoints.
-
-    Note: In production, metrics are served on a separate port via the
-    standalone metrics server. This controller is kept for backward
-    compatibility and testing purposes.
-    """
-
-    path = "/"
-
-    @get("/metrics")  # type: ignore[untyped-decorator]
-    async def metrics(self) -> Response:
-        """Handler for the /metrics endpoint."""
-        return Response(
-            content=get_metrics_output(),
-            headers={"Content-Type": get_metrics_content_type()},
-        )
-
-    @get("/health")  # type: ignore[untyped-decorator]
-    async def health(self) -> dict[str, str]:
-        """Health check for metrics server."""
-        return {"status": "healthy"}
 
 
 # Standalone metrics server using prometheus_client's built-in HTTP server

@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, Generator
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def config() -> Config:
     """Create a test configuration."""
     return Config(host="127.0.0.1", port=8080, log_level="DEBUG")
