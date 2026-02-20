@@ -17,6 +17,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Secure file permissions: owner read/write only (0o600)
+# This ensures sensitive files (keystores, passwords) are not accessible by other users
+KEYSTORE_FILE_PERMISSIONS = 0o600
+
 
 @dataclass
 class KeyPair:
@@ -130,7 +134,7 @@ class KeyStorage:
     def _save_to_managed_storage(
         self, pubkey_hex: str, keystore_json: str, password: str
     ) -> bool:
-        """Atomically save a keystore and password to managed storage."""
+        """Atomically save a keystore and password to managed storage with secure permissions."""
         if self._managed_keystores_dir is None:
             return False
 
@@ -140,7 +144,7 @@ class KeyStorage:
 
         keystore_temp = password_temp = None
         try:
-            # Atomic writes using temp files
+            # Atomic writes using temp files with secure permissions (0o600)
             with tempfile.NamedTemporaryFile(
                 mode="w",
                 dir=self._managed_keystores_dir,
@@ -149,6 +153,8 @@ class KeyStorage:
             ) as f:
                 f.write(keystore_json)
                 keystore_temp = Path(f.name)
+                # Set secure permissions before renaming (owner read/write only)
+                keystore_temp.chmod(KEYSTORE_FILE_PERMISSIONS)
 
             with tempfile.NamedTemporaryFile(
                 mode="w",
@@ -158,6 +164,8 @@ class KeyStorage:
             ) as f:
                 f.write(password)
                 password_temp = Path(f.name)
+                # Set secure permissions before renaming (owner read/write only)
+                password_temp.chmod(KEYSTORE_FILE_PERMISSIONS)
 
             keystore_temp.rename(keystore_file)
             password_temp.rename(password_file)
