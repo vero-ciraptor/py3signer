@@ -60,7 +60,7 @@ class Signer:
             raise SignerError(f"Key not found: {pubkey_hex}")
 
         try:
-            signature = sign(secret_key, data, domain)
+            signature = sign(secret_key, data)
         except Exception as e:
             SIGNING_ERRORS_TOTAL.labels(error_type="signing_failed").inc()
             raise SignerError(f"Signing failed: {e}") from e

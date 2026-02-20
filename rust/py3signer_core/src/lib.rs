@@ -127,16 +127,11 @@ impl PySignature {
     }
 }
 
-/// Sign a message with a secret key and domain
+/// Sign a message with a secret key
 /// Releases the GIL during the BLS signing operation for better concurrency
 #[pyfunction]
 #[allow(clippy::unnecessary_wraps)]
-fn sign(
-    py: Python,
-    secret_key: &PySecretKey,
-    message: &[u8],
-    _domain: &[u8],
-) -> PyResult<PySignature> {
+fn sign(py: Python, secret_key: &PySecretKey, message: &[u8]) -> PyResult<PySignature> {
     // Message is already validated to be 32 bytes by Python
     let message_bytes: [u8; 32] = message.try_into().expect("Message is 32 bytes");
 
@@ -155,13 +150,7 @@ fn sign(
 /// Verify a signature
 /// Releases the GIL during the BLS verification operation for better concurrency
 #[pyfunction]
-fn verify(
-    py: Python,
-    public_key: &PyPublicKey,
-    message: &[u8],
-    signature: &PySignature,
-    _domain: &[u8],
-) -> bool {
+fn verify(py: Python, public_key: &PyPublicKey, message: &[u8], signature: &PySignature) -> bool {
     // Message is already validated to be 32 bytes by Python
     let message_bytes: [u8; 32] = message.try_into().expect("Message is 32 bytes");
 

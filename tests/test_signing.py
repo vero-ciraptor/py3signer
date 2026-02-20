@@ -21,6 +21,10 @@ if TYPE_CHECKING:
 class TestCryptoCore:
     """Tests for the Rust crypto core."""
 
+    # 32-byte test message (simulating an Ethereum signing root)
+    TEST_MESSAGE = b"\x00" * 32
+    WRONG_MESSAGE = b"\x01" + b"\x00" * 31
+
     def test_generate_random_key(self) -> None:
         """Test random key generation."""
         sk1 = generate_random_key()
@@ -72,13 +76,10 @@ class TestCryptoCore:
         sk = generate_random_key()
         pk = sk.public_key()
 
-        message = b"test message"
-        domain = b"\x00\x00\x00\x00"
-
-        signature = sign(sk, message, domain)
+        signature = sign(sk, self.TEST_MESSAGE)
 
         # Verify signature
-        is_valid = verify(pk, message, signature, domain)
+        is_valid = verify(pk, self.TEST_MESSAGE, signature)
         assert is_valid is True
 
     def test_verify_wrong_message(self) -> None:
@@ -86,26 +87,8 @@ class TestCryptoCore:
         sk = generate_random_key()
         pk = sk.public_key()
 
-        message = b"test message"
-        wrong_message = b"wrong message"
-        domain = b"\x00\x00\x00\x00"
-
-        signature = sign(sk, message, domain)
-        is_valid = verify(pk, wrong_message, signature, domain)
-
-        assert is_valid is False
-
-    def test_verify_wrong_domain(self) -> None:
-        """Test verification with wrong domain."""
-        sk = generate_random_key()
-        pk = sk.public_key()
-
-        message = b"test message"
-        domain = b"\x00\x00\x00\x00"
-        wrong_domain = b"\x01\x00\x00\x00"
-
-        signature = sign(sk, message, domain)
-        is_valid = verify(pk, message, signature, wrong_domain)
+        signature = sign(sk, self.TEST_MESSAGE)
+        is_valid = verify(pk, self.WRONG_MESSAGE, signature)
 
         assert is_valid is False
 
@@ -113,10 +96,7 @@ class TestCryptoCore:
         """Test signature serialization roundtrip."""
         sk = generate_random_key()
 
-        message = b"test message"
-        domain = b"\x00\x00\x00\x00"
-
-        sig1 = sign(sk, message, domain)
+        sig1 = sign(sk, self.TEST_MESSAGE)
         sig_bytes = sig1.to_bytes()
 
         sig2 = Signature.from_bytes(sig_bytes)

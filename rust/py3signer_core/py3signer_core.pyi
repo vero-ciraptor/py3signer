@@ -37,12 +37,11 @@ class SecretKey:
 
         """
 
-    def sign(self, message: bytes, domain: bytes) -> Signature:
+    def sign(self, message: bytes) -> Signature:
         """Sign a message with this secret key.
 
         Args:
             message: The message to sign
-            domain: Domain separation bytes (8 bytes for BLS signatures)
 
         Returns:
             The BLS signature
@@ -101,8 +100,8 @@ class Signature:
 
         """
 
-def sign(secret_key: SecretKey, message: bytes, domain: bytes) -> Signature:
-    """Sign a message with a secret key and domain.
+def sign(secret_key: SecretKey, message: bytes) -> Signature:
+    """Sign a message with a secret key.
 
     This function releases the GIL during the BLS signing operation
     for better concurrency.
@@ -110,7 +109,6 @@ def sign(secret_key: SecretKey, message: bytes, domain: bytes) -> Signature:
     Args:
         secret_key: The secret key to sign with
         message: The message to sign
-        domain: Domain separation bytes (8 bytes for BLS signatures)
 
     Returns:
         The BLS signature
@@ -121,7 +119,6 @@ def verify(
     public_key: PublicKey,
     message: bytes,
     signature: Signature,
-    domain: bytes,
 ) -> bool:
     """Verify a BLS signature.
 
@@ -132,7 +129,6 @@ def verify(
         public_key: The public key to verify against
         message: The message that was signed
         signature: The signature to verify
-        domain: Domain separation bytes used during signing
 
     Returns:
         True if the signature is valid, False otherwise
