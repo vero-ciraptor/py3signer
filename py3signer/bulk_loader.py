@@ -5,6 +5,12 @@ from typing import TYPE_CHECKING
 
 from .keystore import Keystore, KeystoreError
 from .models import KeystoreLoadResult
+from .path_utils import (
+    scan_keystore_directories as _scan_keystore_directories,
+)
+from .path_utils import (
+    scan_keystore_directory as _scan_keystore_directory,
+)
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -27,7 +33,7 @@ def scan_keystore_directory(directory: Path) -> dict[str, Path]:
         Dict mapping base name to keystore JSON file path
 
     """
-    keystores: dict[str, Path] = {}
+    keystores = _scan_keystore_directory(directory)
 
     if not directory.exists():
         logger.warning(f"Keystore directory does not exist: {directory}")
@@ -36,18 +42,6 @@ def scan_keystore_directory(directory: Path) -> dict[str, Path]:
     if not directory.is_dir():
         logger.warning(f"Keystore path is not a directory: {directory}")
         return keystores
-
-    # Find all .json files and check for matching .txt files
-    for json_file in directory.glob("*.json"):
-        base_name = json_file.stem
-        password_file = json_file.with_suffix(".txt")
-
-        if password_file.exists():
-            keystores[base_name] = json_file
-        else:
-            logger.warning(
-                f"Skipping {json_file.name}: no matching password file {password_file.name}",
-            )
 
     logger.info(f"Found {len(keystores)} keystore(s) with matching password files")
     return keystores
@@ -70,7 +64,7 @@ def scan_keystore_directories(
         Dict mapping base name to (keystore_path, password_path) tuple
 
     """
-    keystores: dict[str, tuple[Path, Path]] = {}
+    keystores = _scan_keystore_directories(keystores_path, passwords_path)
 
     if not keystores_path.exists():
         logger.warning(f"Keystores directory does not exist: {keystores_path}")
@@ -80,17 +74,15 @@ def scan_keystore_directories(
         logger.warning(f"Keystores path is not a directory: {keystores_path}")
         return keystores
 
-    # Find all .json files in keystores_path
-    for json_file in keystores_path.glob("*.json"):
-        base_name = json_file.stem
-        password_file = passwords_path / f"{base_name}.txt"
-
-        if password_file.exists():
-            keystores[base_name] = (json_file, password_file)
-        else:
-            logger.warning(
-                f"Skipping {json_file.name}: no matching password file in {passwords_path}",
-            )
+    # Log warnings for keystores without matching password files
+    if keystores_path.exists() and keystores_path.is_dir():
+        for json_file in keystores_path.glob("*.json"):
+            base_name = json_file.stem
+            password_file = passwords_path / f"{base_name}.txt"
+            if not password_file.exists():
+                logger.warning(
+                    f"Skipping {json_file.name}: no matching password file in {passwords_path}",
+                )
 
     logger.info(f"Found {len(keystores)} keystore(s) with matching password files")
     return keystores

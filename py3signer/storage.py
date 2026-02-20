@@ -8,6 +8,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from .models import KeyInfo
+from .path_utils import (
+    get_keystore_paths,
+)
 
 if TYPE_CHECKING:
     from py3signer_core import PublicKey, SecretKey
@@ -106,11 +109,7 @@ class KeyStorage:
         if self._managed_keystores_dir is None:
             raise RuntimeError("managed_keystores_dir not configured (no data_dir)")
 
-        base_name = pubkey_hex.lower()
-        return (
-            self._managed_keystores_dir / f"{base_name}.json",
-            self._managed_keystores_dir / f"{base_name}.txt",
-        )
+        return get_keystore_paths(self._managed_keystores_dir, pubkey_hex)
 
     def _get_external_file_paths(
         self, pubkey_hex: str
@@ -123,9 +122,9 @@ class KeyStorage:
         if self._external_keystores_path is None:
             return None, None
 
-        base_name = pubkey_hex.lower()
-        keystore_path = self._external_keystores_path / f"{base_name}.json"
-        password_path = self._external_keystores_path / f"{base_name}.txt"
+        keystore_path, password_path = get_keystore_paths(
+            self._external_keystores_path, pubkey_hex
+        )
         return keystore_path, password_path
 
     def _save_to_managed_storage(
