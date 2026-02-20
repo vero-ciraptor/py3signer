@@ -51,7 +51,7 @@ class Signer:
         if len(domain) != 4:
             raise SignerError(f"Domain must be 4 bytes, got {len(domain)}")
 
-        SIGNING_REQUESTS_TOTAL.labels(key_type="bls").inc()
+        SIGNING_REQUESTS_TOTAL.inc()
         start_time = time.perf_counter()
 
         secret_key = self._storage.get_secret_key(pubkey_hex)
@@ -66,6 +66,6 @@ class Signer:
             raise SignerError(f"Signing failed: {e}") from e
         else:
             duration = time.perf_counter() - start_time
-            SIGNING_DURATION_SECONDS.labels(key_type="bls").observe(duration)
+            SIGNING_DURATION_SECONDS.observe(duration)
             logger.debug(f"Signed data with key: {pubkey_hex[:20]}...")
             return signature
