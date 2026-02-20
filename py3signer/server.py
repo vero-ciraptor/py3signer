@@ -23,10 +23,12 @@ if _workers > 1:
 from granian import Granian  # noqa: E402
 from granian.constants import Interfaces  # noqa: E402
 from litestar import Litestar  # noqa: E402
-from litestar.datastructures import State  # noqa: E402
+from litestar.datastructures import State  # noqa: E402, TC002
+from litestar.di import Provide  # noqa: E402
 
 from .bulk_loader import load_external_keystores  # noqa: E402
 from .handlers import get_routers  # noqa: E402
+from .signer import Signer  # noqa: E402
 from .storage import KeyStorage  # noqa: E402
 
 if TYPE_CHECKING:
@@ -34,9 +36,31 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from .config import Config
-    from .signer import Signer
 
 logger = logging.getLogger(__name__)
+
+
+# Dependency providers for Litestar DI
+
+
+def provide_storage(state: State) -> KeyStorage:
+    """Provide KeyStorage from application state.
+
+    This dependency provider allows handlers to receive KeyStorage
+    via dependency injection instead of accessing request.app.state directly.
+    """
+    result: KeyStorage = state["storage"]
+    return result
+
+
+def provide_signer(state: State) -> Signer:
+    """Provide Signer from application state.
+
+    This dependency provider allows handlers to receive Signer
+    via dependency injection instead of accessing request.app.state directly.
+    """
+    result: Signer = state["signer"]
+    return result
 
 
 def _load_managed_keystores(
@@ -107,8 +131,6 @@ def create_app(
     signer: Signer | None = None,
 ) -> Litestar:
     """Create and configure the Litestar application."""
-    from .signer import Signer
-
     # If config is provided but storage/signer are not, create them
     if config is not None and (storage is None or signer is None):
         storage = KeyStorage(
@@ -161,7 +183,10 @@ def create_app(
         yield
         logger.info("Stopping py3signer server")
 
-    # Create the Litestar app
+    # Create the Litestar app with dependency injection
+    # Use State for storing instances, but provide them via DI
+    from litestar.datastructures import State
+
     return Litestar(
         route_handlers=get_routers(),
         lifespan=[lifespan],
@@ -172,6 +197,10 @@ def create_app(
                 "signer": signer,
             },
         ),
+        dependencies={
+            "storage": Provide(provide_storage, sync_to_thread=False),
+            "signer": Provide(provide_signer, sync_to_thread=False),
+        },
     )
 
 

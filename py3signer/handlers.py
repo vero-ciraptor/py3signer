@@ -126,21 +126,6 @@ class Web3SignerHealthResponse(msgspec.Struct):
     outcome: str
 
 
-# Helper functions to get state from request
-
-
-def _get_storage(request: Request) -> KeyStorage:
-    """Get KeyStorage from app state."""
-    result: KeyStorage = request.app.state["storage"]
-    return result
-
-
-def _get_signer(request: Request) -> Signer:
-    """Get Signer from app state."""
-    result: Signer = request.app.state["signer"]
-    return result
-
-
 # Validation helpers
 
 
@@ -360,9 +345,8 @@ class HealthController(Controller):  # type: ignore[misc]
     path = "/"
 
     @get("/health")  # type: ignore[untyped-decorator]
-    async def health(self, request: Request) -> HealthResponse:
+    async def health(self, storage: KeyStorage) -> HealthResponse:
         """Health check endpoint."""
-        storage = _get_storage(request)
         return HealthResponse(status="healthy", keys_loaded=len(storage))
 
     @get("/healthcheck")  # type: ignore[untyped-decorator]
@@ -380,10 +364,8 @@ class LocalKeyManagerController(Controller):  # type: ignore[misc]
     path = "/eth/v1/keystores"
 
     @get()  # type: ignore[untyped-decorator]
-    async def list_keystores(self, request: Request) -> Response[dict[str, Any]]:
+    async def list_keystores(self, storage: KeyStorage) -> Response[dict[str, Any]]:
         """GET /eth/v1/keystores - List all imported keys."""
-        storage = _get_storage(request)
-
         keys = storage.list_keys()
         keystores = [
             KeystoreInfo(
@@ -401,14 +383,13 @@ class LocalKeyManagerController(Controller):  # type: ignore[misc]
     @post()  # type: ignore[untyped-decorator]
     async def import_keystores(
         self,
-        request: Request,
         data: dict[str, Any],
+        storage: KeyStorage,
     ) -> Response[dict[str, Any]]:
         """POST /eth/v1/keystores - Import keystores.
 
         Accepts EIP-3076 slashing_protection data (stored but not processed).
         """
-        storage = _get_storage(request)
         import_request = _validate_import_request(data)
 
         # Log if slashing protection data was provided (we accept but don't process it)
@@ -443,15 +424,14 @@ class LocalKeyManagerController(Controller):  # type: ignore[misc]
     @delete(status_code=HTTP_200_OK)  # type: ignore[untyped-decorator]
     async def delete_keystores(
         self,
-        request: Request,
         data: dict[str, Any],
+        storage: KeyStorage,
     ) -> Response[dict[str, Any]]:
         """DELETE /eth/v1/keystores - Delete keystores.
 
         Returns slashing protection data for keys that were active or had data.
         Per the spec, slashing protection data must be retained even after deletion.
         """
-        storage = _get_storage(request)
         delete_request = _validate_delete_request(data)
 
         results: list[KeystoreDeleteResult] = []
@@ -480,18 +460,20 @@ class SigningController(Controller):  # type: ignore[misc]
     path = "/api/v1/eth2"
 
     @get("/publicKeys")  # type: ignore[untyped-decorator]
-    async def list_public_keys(self, request: Request) -> Response[list[str]]:
+    async def list_public_keys(self, storage: KeyStorage) -> Response[list[str]]:
         """GET /api/v1/eth2/publicKeys - List available BLS public keys."""
-        storage = _get_storage(request)
         keys = storage.list_keys()
         public_keys = [f"0x{key_info.pubkey_hex}" for key_info in keys]
         return Response(content=public_keys, status_code=HTTP_200_OK)
 
     @post("/sign/{identifier:str}")  # type: ignore[untyped-decorator]
-    async def sign(self, request: Request, identifier: str) -> Response:
+    async def sign(
+        self,
+        request: Request,
+        identifier: str,
+        signer: Signer,
+    ) -> Response:
         """POST /api/v1/eth2/sign/:identifier - Sign data."""
-        signer = _get_signer(request)
-
         pubkey_hex = _clean_pubkey_hex(identifier)
         if not pubkey_hex:
             raise ValidationException(detail="Missing identifier")
