@@ -450,10 +450,11 @@ def validate_signing_root(signing_root: str | None) -> bytes | None:
     if signing_root is None:
         return None
 
-    signing_root_clean = signing_root.replace("0x", "")
-    if len(signing_root_clean) != 64:
+    # Use slicing instead of replace() - O(1) vs O(n)
+    signing_root = signing_root.removeprefix("0x")
+    if len(signing_root) != 64:
         raise ValueError("signing_root must be 32 bytes (64 hex characters)")
     try:
-        return bytes.fromhex(signing_root_clean)
+        return bytes.fromhex(signing_root)
     except ValueError as e:
         raise ValueError(f"signing_root must be valid hexadecimal: {e}") from e

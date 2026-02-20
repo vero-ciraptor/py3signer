@@ -221,7 +221,8 @@ def _clean_pubkey_hex(pubkey_hex: str) -> str:
         Cleaned hex string
 
     """
-    return pubkey_hex.lower().replace("0x", "")
+    # Use removeprefix() instead of replace() - stops at first match vs scans entire string
+    return pubkey_hex.removeprefix("0x").lower()
 
 
 # Import helper
