@@ -18,7 +18,6 @@ const BLS_DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
 /// The signing root (32 bytes) is computed by the validator client and
 /// already includes the domain. No additional hashing is needed before
 /// passing to BLS sign.
-#[inline]
 fn prepare_message(message: &[u8], domain: &[u8]) -> [u8; 32] {
     // The message should already be a 32-byte signing root
     if message.len() == 32 {
@@ -29,7 +28,6 @@ fn prepare_message(message: &[u8], domain: &[u8]) -> [u8; 32] {
     }
 }
 
-#[inline(never)]
 fn prepare_message_hashed(message: &[u8], domain: &[u8]) -> [u8; 32] {
     let mut hasher = Sha256::new();
     hasher.update(domain);
@@ -66,7 +64,6 @@ impl PySecretKey {
     }
 
     /// Serialize to 32 bytes
-    #[inline]
     #[allow(clippy::unnecessary_wraps)]
     fn to_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
         let bytes = self.inner.to_bytes();
@@ -74,7 +71,6 @@ impl PySecretKey {
     }
 
     /// Get the corresponding public key
-    #[inline]
     #[allow(clippy::unnecessary_wraps)]
     fn public_key(&self) -> PyResult<PyPublicKey> {
         Ok(PyPublicKey {
@@ -110,7 +106,6 @@ impl PyPublicKey {
     }
 
     /// Serialize to 48 bytes (compressed G1 point)
-    #[inline]
     #[allow(clippy::unnecessary_wraps)]
     fn to_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
         // For min_sig, public keys are G1 points: 48 bytes compressed
@@ -146,7 +141,6 @@ impl PySignature {
     }
 
     /// Serialize to 96 bytes (compressed G2 point)
-    #[inline]
     #[allow(clippy::unnecessary_wraps)]
     fn to_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
         // For min_sig, signatures are G2 points: 96 bytes compressed
@@ -287,7 +281,6 @@ mod keystore {
 
     impl KdfParams {
         /// Get the salt from KDF params regardless of variant
-        #[inline]
         pub fn salt(&self) -> &str {
             match self {
                 KdfParams::Scrypt { salt, .. } | KdfParams::Pbkdf2 { salt, .. } => salt,
