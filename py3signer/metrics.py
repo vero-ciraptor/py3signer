@@ -119,9 +119,11 @@ if _is_multiprocess and _multiproc_dir is None:
 if _is_multiprocess:
     from prometheus_client import multiprocess
 
-    # In multi-process mode, use the default registry which is aware of
-    # PROMETHEUS_MULTIPROC_DIR and will use MultiProcessCollector automatically
-    # when generate_latest() is called without an explicit registry
+    # In multi-process mode, create a registry with only MultiProcessCollector.
+    # Individual metrics should NOT be registered to this registry - they will
+    # be collected by MultiProcessCollector from the files in PROMETHEUS_MULTIPROC_DIR.
+    # This prevents duplication where metrics appear twice (once from MultiProcessCollector
+    # with correct values, once from individual collectors with zero values).
     REGISTRY = CollectorRegistry()
     multiprocess.MultiProcessCollector(REGISTRY, path=str(_multiproc_dir))  # type: ignore[no-untyped-call]
     logger.info(
@@ -131,11 +133,16 @@ else:
     REGISTRY = CollectorRegistry()
     logger.debug("Using single-process Prometheus metrics mode")
 
+# In multi-process mode, individual metrics should NOT be registered to REGISTRY.
+# Only MultiProcessCollector should be in REGISTRY to avoid duplication.
+# The metrics still work because they write to files in PROMETHEUS_MULTIPROC_DIR.
+_METRIC_REGISTRY = None if _is_multiprocess else REGISTRY
+
 # Application info
 APP_INFO = Info(
     "py3signer_build_info",
     "Build information about py3signer",
-    registry=REGISTRY,
+    registry=_METRIC_REGISTRY,
 )
 APP_INFO.info({"version": "0.1.0", "name": "py3signer"})
 
@@ -143,21 +150,21 @@ APP_INFO.info({"version": "0.1.0", "name": "py3signer"})
 SIGNING_REQUESTS_TOTAL = Counter(
     "signing_requests_total",
     "Total number of signing requests",
-    registry=REGISTRY,
+    registry=_METRIC_REGISTRY,
 )
 
 SIGNING_DURATION_SECONDS = Histogram(
     "signing_duration_seconds",
     "Time spent performing signing operations",
     buckets=[0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0],
-    registry=REGISTRY,
+    registry=_METRIC_REGISTRY,
 )
 
 SIGNING_ERRORS_TOTAL = Counter(
     "signing_errors_total",
     "Total number of signing errors",
     ["error_type"],
-    registry=REGISTRY,
+    registry=_METRIC_REGISTRY,
 )
 
 # Key metrics
@@ -165,7 +172,7 @@ SIGNING_ERRORS_TOTAL = Counter(
 KEYS_LOADED = Gauge(
     "keys_loaded",
     "Number of keys currently loaded",
-    registry=REGISTRY,
+    registry=_METRIC_REGISTRY,
     multiprocess_mode="max",
 )
 
