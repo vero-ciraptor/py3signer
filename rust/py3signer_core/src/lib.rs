@@ -4,22 +4,37 @@ use pyo3::prelude::*;
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
+/// Size of a BLS secret key in bytes
+const SECRET_KEY_SIZE: usize = 32;
+/// Size of a BLS public key (compressed G1) in bytes
+const PUBLIC_KEY_SIZE: usize = 48;
+/// Size of a BLS signature (compressed G2) in bytes
+const SIGNATURE_SIZE: usize = 96;
+
+/// BLS signature domain separation tag for Ethereum consensus
+const BLS_DST: &[u8] = b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_";
+
 /// Ethereum consensus signing uses the signing root directly.
 /// The signing root (32 bytes) is computed by the validator client and
 /// already includes the domain. No additional hashing is needed before
 /// passing to BLS sign.
-fn prepare_message(message: &[u8], _domain: &[u8]) -> [u8; 32] {
+#[inline]
+fn prepare_message(message: &[u8], domain: &[u8]) -> [u8; 32] {
     // The message should already be a 32-byte signing root
     if message.len() == 32 {
         message.try_into().expect("Message is 32 bytes")
     } else {
         // Fallback: hash if not 32 bytes (should not happen for consensus signing)
-        let mut hasher = Sha256::new();
-        #[allow(clippy::used_underscore_binding)]
-        hasher.update(_domain);
-        hasher.update(message);
-        hasher.finalize().into()
+        prepare_message_hashed(message, domain)
     }
+}
+
+#[inline(never)]
+fn prepare_message_hashed(message: &[u8], domain: &[u8]) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(domain);
+    hasher.update(message);
+    hasher.finalize().into()
 }
 
 /// `PyO3` wrapper for BLS `SecretKey`
@@ -34,18 +49,15 @@ impl PySecretKey {
     /// Create a `SecretKey` from 32 bytes
     #[staticmethod]
     fn from_bytes(bytes: &[u8]) -> PyResult<Self> {
-        if bytes.len() != 32 {
+        if bytes.len() != SECRET_KEY_SIZE {
             return Err(PyValueError::new_err(format!(
-                "SecretKey must be 32 bytes, got {}",
+                "SecretKey must be {} bytes, got {}",
+                SECRET_KEY_SIZE,
                 bytes.len()
             )));
         }
 
-        let key_bytes: [u8; 32] = bytes
-            .try_into()
-            .map_err(|_| PyValueError::new_err("Invalid byte length"))?;
-
-        let sk = SecretKey::from_bytes(&key_bytes)
+        let sk = SecretKey::from_bytes(bytes)
             .map_err(|e| PyValueError::new_err(format!("Invalid secret key: {e:?}")))?;
 
         Ok(PySecretKey {
@@ -54,6 +66,7 @@ impl PySecretKey {
     }
 
     /// Serialize to 32 bytes
+    #[inline]
     #[allow(clippy::unnecessary_wraps)]
     fn to_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
         let bytes = self.inner.to_bytes();
@@ -61,6 +74,7 @@ impl PySecretKey {
     }
 
     /// Get the corresponding public key
+    #[inline]
     #[allow(clippy::unnecessary_wraps)]
     fn public_key(&self) -> PyResult<PyPublicKey> {
         Ok(PyPublicKey {
@@ -81,9 +95,10 @@ impl PyPublicKey {
     /// Create a `PublicKey` from 48 bytes (compressed)
     #[staticmethod]
     fn from_bytes(bytes: &[u8]) -> PyResult<Self> {
-        if bytes.len() != 48 {
+        if bytes.len() != PUBLIC_KEY_SIZE {
             return Err(PyValueError::new_err(format!(
-                "PublicKey must be 48 bytes, got {}",
+                "PublicKey must be {} bytes, got {}",
+                PUBLIC_KEY_SIZE,
                 bytes.len()
             )));
         }
@@ -95,6 +110,7 @@ impl PyPublicKey {
     }
 
     /// Serialize to 48 bytes (compressed G1 point)
+    #[inline]
     #[allow(clippy::unnecessary_wraps)]
     fn to_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
         // For min_sig, public keys are G1 points: 48 bytes compressed
@@ -115,9 +131,10 @@ impl PySignature {
     /// Create a `Signature` from 96 bytes (compressed)
     #[staticmethod]
     fn from_bytes(bytes: &[u8]) -> PyResult<Self> {
-        if bytes.len() != 96 {
+        if bytes.len() != SIGNATURE_SIZE {
             return Err(PyValueError::new_err(format!(
-                "Signature must be 96 bytes, got {}",
+                "Signature must be {} bytes, got {}",
+                SIGNATURE_SIZE,
                 bytes.len()
             )));
         }
@@ -129,6 +146,7 @@ impl PySignature {
     }
 
     /// Serialize to 96 bytes (compressed G2 point)
+    #[inline]
     #[allow(clippy::unnecessary_wraps)]
     fn to_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
         // For min_sig, signatures are G2 points: 96 bytes compressed
@@ -155,11 +173,7 @@ fn sign(
     // Release the GIL during the BLS signing operation
     let signature = py.detach(move || {
         // blst::min_sig::SecretKey::sign returns Signature directly (not Result)
-        sk.sign(
-            &message_bytes,
-            b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_",
-            &[],
-        )
+        sk.sign(&message_bytes, BLS_DST, &[])
     });
 
     Ok(PySignature { inner: signature })
@@ -184,17 +198,10 @@ fn verify(
     // Release the GIL during the BLS verification operation
     let result = py.detach(move || {
         // Correct API for min_pk: verify(sig_groupcheck, msg, dst, aug, pk, pk_validate)
-        sig.verify(
-            true,                                           // sig_groupcheck
-            &message_bytes,                                 // msg (already the signing root)
-            b"BLS_SIG_BLS12381G2_XMD:SHA-256_SSWU_RO_POP_", // dst
-            &[],                                            // aug
-            &pk,                                            // pk
-            true,                                           // pk_validate
-        )
+        sig.verify(true, &message_bytes, BLS_DST, &[], &pk, true)
     });
 
-    matches!(result, blst::BLST_ERROR::BLST_SUCCESS)
+    result == blst::BLST_ERROR::BLST_SUCCESS
 }
 
 /// Generate a random secret key (for testing)
@@ -208,14 +215,13 @@ fn generate_random_key(py: Python) -> PyResult<PySecretKey> {
     let token_bytes = secrets.getattr("token_bytes")?;
 
     // BLS12-381 scalar field order is slightly less than 2^255
-    // We'll use rejection sampling: generate random bytes, check if valid
+    // We use rejection sampling: generate random bytes, check if valid
     for _ in 0..100 {
         // Limit iterations to prevent infinite loop
-        let random_bytes: Bound<PyBytes> = token_bytes.call1((32,))?.extract()?;
-        let bytes: &[u8] = random_bytes.as_bytes();
+        let random_bytes: Bound<PyBytes> = token_bytes.call1((SECRET_KEY_SIZE,))?.extract()?;
 
         // Try to create a secret key - it will fail if bytes >= curve order
-        if let Ok(sk) = SecretKey::from_bytes(bytes) {
+        if let Ok(sk) = SecretKey::from_bytes(random_bytes.as_bytes()) {
             return Ok(PySecretKey {
                 inner: Arc::new(sk),
             });
@@ -279,6 +285,16 @@ mod keystore {
         },
     }
 
+    impl KdfParams {
+        /// Get the salt from KDF params regardless of variant
+        #[inline]
+        pub fn salt(&self) -> &str {
+            match self {
+                KdfParams::Scrypt { salt, .. } | KdfParams::Pbkdf2 { salt, .. } => salt,
+            }
+        }
+    }
+
     #[derive(Debug, Serialize, Deserialize)]
     pub struct Checksum {
         pub function: String,
@@ -303,11 +319,18 @@ mod keystore {
         let keystore: Keystore = serde_json::from_str(keystore_json)
             .map_err(|e| PyValueError::new_err(format!("Invalid keystore JSON: {e}")))?;
 
+        // Verify version FIRST - only version 4 (EIP-2335) is supported
+        // Do this before expensive KDF operations
+        if keystore.version != 4 {
+            return Err(PyValueError::new_err(format!(
+                "Keystore version {} is not supported, only version 4 (EIP-2335) is supported",
+                keystore.version
+            )));
+        }
+
         // Decode salt and ciphertext
-        let salt = hex::decode(match &keystore.crypto.kdf.params {
-            KdfParams::Scrypt { salt, .. } | KdfParams::Pbkdf2 { salt, .. } => salt,
-        })
-        .map_err(|e| PyValueError::new_err(format!("Invalid salt: {e}")))?;
+        let salt = hex::decode(keystore.crypto.kdf.params.salt())
+            .map_err(|e| PyValueError::new_err(format!("Invalid salt: {e}")))?;
 
         let ciphertext = hex::decode(&keystore.crypto.cipher.message)
             .map_err(|e| PyValueError::new_err(format!("Invalid ciphertext: {e}")))?;
@@ -316,7 +339,8 @@ mod keystore {
             .map_err(|e| PyValueError::new_err(format!("Invalid IV: {e}")))?;
 
         // Derive key using specified KDF
-        let mut key = vec![0u8; 32];
+        // Use stack-allocated fixed-size array instead of Vec
+        let mut key = [0u8; 32];
         match &keystore.crypto.kdf.params {
             KdfParams::Scrypt { n, r, p, dklen, .. } => {
                 // Convert n to log2(n) for scrypt params
@@ -331,18 +355,12 @@ mod keystore {
             }
             KdfParams::Pbkdf2 { c, dklen, .. } => {
                 pbkdf2::pbkdf2_hmac::<sha2::Sha256>(password.as_bytes(), &salt, *c, &mut key);
-                if *dklen as usize != key.len() {
-                    key.truncate(*dklen as usize);
-                }
+                debug_assert_eq!(
+                    *dklen as usize,
+                    key.len(),
+                    "Invalid dklen in keystore - expected 32"
+                );
             }
-        }
-
-        // Verify checksum - only version 4 (EIP-2335) is supported
-        if keystore.version != 4 {
-            return Err(PyValueError::new_err(format!(
-                "Keystore version {} is not supported, only version 4 (EIP-2335) is supported",
-                keystore.version
-            )));
         }
 
         let expected_checksum = hex::decode(&keystore.crypto.checksum.message)
@@ -361,30 +379,28 @@ mod keystore {
         }
 
         // Decrypt based on cipher function
-        let cipher_function = keystore.crypto.cipher.function.as_str();
-        let mut plaintext = ciphertext.clone();
-
-        match cipher_function {
+        // Reuse ciphertext buffer instead of cloning
+        match keystore.crypto.cipher.function.as_str() {
             "aes-128-ctr" => {
                 // EIP-2335 specifies aes-128-ctr: use first 16 bytes of decryption key
+                let mut plaintext = ciphertext; // Move instead of clone
                 let mut cipher = Aes128Ctr::new_from_slices(&key[0..16], &iv)
                     .map_err(|e| PyRuntimeError::new_err(format!("Cipher init failed: {e}")))?;
                 cipher.apply_keystream(&mut plaintext);
+                Ok(plaintext)
             }
             "aes-256-ctr" => {
                 // Extended cipher: use full 32 bytes of decryption key
+                let mut plaintext = ciphertext; // Move instead of clone
                 let mut cipher = Aes256Ctr::new_from_slices(&key[0..32], &iv)
                     .map_err(|e| PyRuntimeError::new_err(format!("Cipher init failed: {e}")))?;
                 cipher.apply_keystream(&mut plaintext);
+                Ok(plaintext)
             }
-            _ => {
-                return Err(PyValueError::new_err(format!(
-                    "Unsupported cipher function: {cipher_function}. Only aes-128-ctr and aes-256-ctr are supported."
-                )));
-            }
+            cipher_function => Err(PyValueError::new_err(format!(
+                "Unsupported cipher function: {cipher_function}. Only aes-128-ctr and aes-256-ctr are supported."
+            ))),
         }
-
-        Ok(plaintext)
     }
 }
 
@@ -420,7 +436,7 @@ mod tests {
     #[test]
     fn test_key_roundtrip() {
         // Generate a test key (32 bytes)
-        let key_bytes = [1u8; 32];
+        let key_bytes = [1u8; SECRET_KEY_SIZE];
         let sk = PySecretKey::from_bytes(&key_bytes).unwrap();
         // Just test that it doesn't panic
         assert!(sk.public_key().is_ok());
@@ -428,7 +444,7 @@ mod tests {
 
     #[test]
     fn test_public_key_from_secret() {
-        let key_bytes = [1u8; 32];
+        let key_bytes = [1u8; SECRET_KEY_SIZE];
         let sk = PySecretKey::from_bytes(&key_bytes).unwrap();
         let pk = sk.public_key().unwrap();
         // Public key should be valid
