@@ -13,8 +13,6 @@ dependencies = [
     "granian>=2.7.0",
     "msgspec>=0.20.0",
     "prometheus-client>=0.24.0",
-    "pytheus-backend-rs>=0.0.9",
-    "pytheus>=0.6.1",
 ]
 
 [project.scripts]
