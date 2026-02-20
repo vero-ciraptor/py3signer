@@ -1,4 +1,6 @@
 """Litestar server setup with Granian ASGI server."""
+# Because of prometheus multiproc setup
+# ruff: noqa: E402
 
 from __future__ import annotations
 
@@ -20,16 +22,16 @@ if _workers > 1:
         _temp_dir = tempfile.mkdtemp(prefix="py3signer_metrics_")
         os.environ["PROMETHEUS_MULTIPROC_DIR"] = _temp_dir
 
-from granian import Granian  # noqa: E402
-from granian.constants import Interfaces  # noqa: E402
-from litestar import Litestar  # noqa: E402
-from litestar.datastructures import State  # noqa: E402, TC002
-from litestar.di import Provide  # noqa: E402
+from granian import Granian
+from granian.constants import Interfaces
+from litestar import Litestar
+from litestar.datastructures import State  # noqa: TC002
+from litestar.di import Provide
 
-from .bulk_loader import load_external_keystores  # noqa: E402
-from .handlers import get_routers  # noqa: E402
-from .signer import Signer  # noqa: E402
-from .storage import KeyStorage  # noqa: E402
+from .bulk_loader import load_external_keystores
+from .handlers import get_routers
+from .signer import Signer
+from .storage import KeyStorage
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
