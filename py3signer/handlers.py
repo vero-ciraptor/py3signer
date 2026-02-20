@@ -126,6 +126,46 @@ class Web3SignerHealthResponse(msgspec.Struct):
     outcome: str
 
 
+# Response wrapper structs to streamline serialization pipeline
+
+
+class ListKeystoresResponse(msgspec.Struct):
+    """Response for listing keystores.
+
+    Directly serializable by msgspec, eliminating manual to_builtins conversion.
+    """
+
+    data: list[KeystoreInfo]
+
+
+class ImportKeystoresResponse(msgspec.Struct):
+    """Response for importing keystores.
+
+    Directly serializable by msgspec, eliminating manual to_builtins conversion.
+    """
+
+    data: list[KeystoreImportResult]
+
+
+class DeleteKeystoresResponse(msgspec.Struct):
+    """Response for deleting keystores.
+
+    Directly serializable by msgspec, eliminating manual to_builtins conversion.
+    """
+
+    data: list[KeystoreDeleteResult]
+    slashing_protection: dict[str, Any]
+
+
+class SignResponse(msgspec.Struct):
+    """Response for signing operations.
+
+    Directly serializable by msgspec.
+    """
+
+    signature: str
+
+
 # Validation helpers
 
 
@@ -364,7 +404,7 @@ class LocalKeyManagerController(Controller):  # type: ignore[misc]
     path = "/eth/v1/keystores"
 
     @get()  # type: ignore[untyped-decorator]
-    async def list_keystores(self, storage: KeyStorage) -> Response[dict[str, Any]]:
+    async def list_keystores(self, storage: KeyStorage) -> ListKeystoresResponse:
         """GET /eth/v1/keystores - List all imported keys."""
         keys = storage.list_keys()
         keystores = [
@@ -375,17 +415,14 @@ class LocalKeyManagerController(Controller):  # type: ignore[misc]
             )
             for key_info in keys
         ]
-        return Response(
-            content={"data": [msgspec.to_builtins(k) for k in keystores]},
-            status_code=HTTP_200_OK,
-        )
+        return ListKeystoresResponse(data=keystores)
 
-    @post()  # type: ignore[untyped-decorator]
+    @post(status_code=HTTP_200_OK)  # type: ignore[untyped-decorator]
     async def import_keystores(
         self,
         data: dict[str, Any],
         storage: KeyStorage,
-    ) -> Response[dict[str, Any]]:
+    ) -> ImportKeystoresResponse:
         """POST /eth/v1/keystores - Import keystores.
 
         Accepts EIP-3076 slashing_protection data (stored but not processed).
@@ -416,17 +453,14 @@ class LocalKeyManagerController(Controller):  # type: ignore[misc]
             )
         ]
 
-        return Response(
-            content={"data": [msgspec.to_builtins(result) for result in results]},
-            status_code=HTTP_200_OK,
-        )
+        return ImportKeystoresResponse(data=results)
 
     @delete(status_code=HTTP_200_OK)  # type: ignore[untyped-decorator]
     async def delete_keystores(
         self,
         data: dict[str, Any],
         storage: KeyStorage,
-    ) -> Response[dict[str, Any]]:
+    ) -> DeleteKeystoresResponse:
         """DELETE /eth/v1/keystores - Delete keystores.
 
         Returns slashing protection data for keys that were active or had data.
@@ -445,12 +479,9 @@ class LocalKeyManagerController(Controller):  # type: ignore[misc]
 
         slashing_protection = _build_slashing_protection_response(slashing_entries)
 
-        return Response(
-            content={
-                "data": [msgspec.to_builtins(r) for r in results],
-                "slashing_protection": slashing_protection,
-            },
-            status_code=HTTP_200_OK,
+        return DeleteKeystoresResponse(
+            data=results,
+            slashing_protection=slashing_protection,
         )
 
 
@@ -460,19 +491,18 @@ class SigningController(Controller):  # type: ignore[misc]
     path = "/api/v1/eth2"
 
     @get("/publicKeys")  # type: ignore[untyped-decorator]
-    async def list_public_keys(self, storage: KeyStorage) -> Response[list[str]]:
+    async def list_public_keys(self, storage: KeyStorage) -> list[str]:
         """GET /api/v1/eth2/publicKeys - List available BLS public keys."""
         keys = storage.list_keys()
-        public_keys = [f"0x{key_info.pubkey_hex}" for key_info in keys]
-        return Response(content=public_keys, status_code=HTTP_200_OK)
+        return [f"0x{key_info.pubkey_hex}" for key_info in keys]
 
-    @post("/sign/{identifier:str}")  # type: ignore[untyped-decorator]
+    @post("/sign/{identifier:str}", status_code=HTTP_200_OK)  # type: ignore[untyped-decorator]
     async def sign(
         self,
         request: Request,
         identifier: str,
         signer: Signer,
-    ) -> Response:
+    ) -> Response | SignResponse:
         """POST /api/v1/eth2/sign/:identifier - Sign data."""
         pubkey_hex = _clean_pubkey_hex(identifier)
         if not pubkey_hex:
@@ -530,11 +560,7 @@ class SigningController(Controller):  # type: ignore[misc]
                 media_type="text/plain",
             )
 
-        return Response(
-            content={"signature": full_signature},
-            status_code=HTTP_200_OK,
-            media_type="application/json",
-        )
+        return SignResponse(signature=full_signature)
 
 
 # Router configuration
