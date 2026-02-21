@@ -11,7 +11,7 @@ FROM docker.io/library/rust:${RUST_IMAGE_TAG} AS rust-toolchain
 # Build stage
 FROM docker.io/library/python:${PYTHON_IMAGE_TAG} AS build
 
-WORKDIR /build
+WORKDIR /py3signer
 
 # Install build dependencies
 # hadolint ignore=DL3008
@@ -26,42 +26,30 @@ COPY --from=rust-toolchain /usr/local/cargo /usr/local/cargo
 COPY --from=rust-toolchain /usr/local/rustup /usr/local/rustup
 ENV PATH="/usr/local/cargo/bin:${PATH}"
 ENV RUSTUP_HOME="/usr/local/rustup"
+RUN rustup default stable
 
-# Install maturin
+# Copy all project files
+COPY . .
+
+# Install dependencies and build (maturin compiles Rust extension automatically)
 RUN --mount=from=uv-image,source=/uv,target=/bin/uv \
     --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system maturin
-
-# Copy project files
-COPY Cargo.toml .
-COPY rust/ rust/
-COPY py3signer/__init__.py py3signer/__init__.py
-COPY pyproject.toml .
-COPY README.md .
-
-# Build Rust extension
-RUN --mount=type=cache,target=/root/.cache/uv \
-    maturin build --release -o dist
+    uv sync --frozen --no-dev --compile-bytecode
 
 # Runtime stage
 FROM docker.io/library/python:${PYTHON_IMAGE_TAG}
 
-# Create non-root user
+ENV PATH="/py3signer/.venv/bin:$PATH"
+
+WORKDIR /py3signer
+
 RUN groupadd -g 1000 py3signer && \
-    useradd --no-create-home --shell /bin/false -u 1000 -g py3signer py3signer
+    useradd --no-create-home --shell /bin/false -u 1000 -g py3signer py3signer && \
+    chown -R py3signer:py3signer /py3signer
 
-WORKDIR /app
-
-# Install runtime dependencies and Python package
-RUN --mount=from=uv-image,source=/uv,target=/bin/uv \
-    --mount=from=build,source=/build/dist,target=/tmp/dist \
-    --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system /tmp/dist/*.whl
-
-# Copy application code
+COPY --from=build --chown=py3signer:py3signer /py3signer/.venv /py3signer/.venv
 COPY --chown=py3signer:py3signer py3signer/ py3signer/
 
-# Switch to non-root user
 USER py3signer
 
 EXPOSE 8080
