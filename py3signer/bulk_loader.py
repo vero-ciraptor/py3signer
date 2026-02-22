@@ -123,7 +123,7 @@ def load_keystore_with_password(
         secret_key=secret_key,
         path=keystore.path,
         description=keystore.description,
-        password=password,
+        _password=bytearray(password, "utf-8"),
     )
 
 
@@ -157,6 +157,8 @@ def _load_single_keystore(
                 result.path,
                 result.description,
             )
+            # Clear password after use (external keys don't need password persistence)
+            result.clear_password()
         else:
             # Read keystore JSON for persistence to managed storage
             keystore_json = keystore_path.read_text()
@@ -169,19 +171,20 @@ def _load_single_keystore(
                 keystore_json=keystore_json,
                 password=result.password,
             )
-
-        logger.info(f"Loaded keystore: {base_name}")
-        return True
+            # Clear password after it has been written to storage
+            result.clear_password()
     except KeystoreError as e:
         logger.error(f"Failed to load keystore {base_name}: {e}")
+        return False
     except ValueError as e:
         logger.error(f"Failed to add keystore {base_name} to storage: {e}")
+        return False
     except Exception as e:
         logger.error(f"Unexpected error loading keystore {base_name}: {e}")
+        return False
     else:
         logger.info(f"Loaded keystore: {base_name}")
         return True
-    return False
 
 
 def load_keystores_from_directory(
