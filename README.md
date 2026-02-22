@@ -2,7 +2,21 @@
 
 A high-performance remote BLS signer for Ethereum Consensus Layer with a hybrid Python/Rust architecture.
 
-⚠️ **No Slashing Protection**: This signer has no slashing protection. Running multiple validators with the same keys will result in slashing.
+⚠️ **Experimental / Not for Production**: This software is intended for **experimenting, prototyping, and testing only**. It is **NOT recommended for production use** with real validator keys or mainnet operations.
+
+### Security Limitations
+
+- **Private keys in memory**: Keys are held in memory continuously and can be extracted via memory dumps or core dumps
+- **No HSM/TEE integration**: No hardware security module or trusted execution environment support
+- **Limited memory protection**: Password clearing provides marginal protection for a continuous signer (keys remain in memory)
+- **No slashing protection**: Running multiple validators with the same keys will result in slashing
+
+### Production Alternatives
+
+For production validator signing, consider using:
+- **[Web3Signer](https://github.com/Consensys/web3signer)** – Enterprise-grade remote signer with slashing protection
+- **[Dirk](https://github.com/attestantio/dirk)** – Distributed remote key manager for Ethereum validators
+- **HSM-based signers** – Hardware security modules (e.g., YubiHSM, AWS CloudHSM) with proper key protection
 
 ## Overview
 
