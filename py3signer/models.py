@@ -3,14 +3,14 @@
 This module contains dataclasses and structured types used across the codebase.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from py3signer_core import PublicKey, SecretKey
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(slots=True)
 class KeystoreLoadResult:
     """Result of loading a keystore with its password.
 
@@ -19,7 +19,7 @@ class KeystoreLoadResult:
         secret_key: The secret key
         path: The derivation path
         description: Optional description from the keystore
-        password: The password used to decrypt the keystore
+        password: The password used to decrypt the keystore (read-only property)
 
     """
 
@@ -27,7 +27,25 @@ class KeystoreLoadResult:
     secret_key: SecretKey
     path: str
     description: str | None
-    password: str
+    _password: bytearray = field(repr=False)
+
+    @property
+    def password(self) -> str:
+        """Return the password as a string for immediate use.
+
+        Returns:
+            The password string decoded from the internal bytearray.
+        """
+        return self._password.decode("utf-8")
+
+    def clear_password(self) -> None:
+        """Clear the password from memory by zeroing out the bytearray.
+
+        This should be called after the password is no longer needed to
+        minimize the time the password exists in memory.
+        """
+        for i in range(len(self._password)):
+            self._password[i] = 0
 
 
 @dataclass(frozen=True, slots=True)
